@@ -1241,7 +1241,6 @@ export const analyzeFaceLandmarks = (
     eyeGeometry,
     overlayAnchors,
   });
-  if (!metricConfidence.reportable) return null;
 
   const measurements: MeasurementDisplayItem[] = EYEBROW_METRIC_DISPLAY_KEYS.map((key) => ({
     ...EYEBROW_METRIC_DISPLAY_COPY[key],

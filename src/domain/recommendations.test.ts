@@ -400,7 +400,7 @@ describe('eyebrow recommendations', () => {
       ...readyContext,
       pxToMmScale: Number.NaN,
     }).reason).toBe('missing_scale');
-    expect(validateEyebrowRecommendationContext({
+    const lowReportabilityContext = {
       ...readyContext,
       metricConfidence: {
         targetErrorMm: 3,
@@ -412,7 +412,9 @@ describe('eyebrow recommendations', () => {
         reportable: false,
         metrics: {},
       },
-    }).reason).toBe('low_confidence');
+    };
+    expect(validateEyebrowRecommendationContext(lowReportabilityContext).reason).toBeNull();
+    expect(buildEyebrowRecommendationStateFromContext(lowReportabilityContext).status).toBe('ready');
     expect(validateEyebrowRecommendationContext({
       ...readyContext,
       eyebrowPosition: null,
