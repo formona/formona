@@ -28,48 +28,60 @@ const loadFaceLandmarkerModule = async ({
 
 describe('MediaPipe face landmarker infrastructure adapter', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.doUnmock('@mediapipe/tasks-vision');
     vi.resetModules();
   });
 
-  it('creates and caches a GPU face landmarker instance', async () => {
+  it('creates and caches a CPU-compatible face landmarker instance', async () => {
     const landmarker = { detectForVideo: vi.fn() };
     const faceLandmarkerModule = await loadFaceLandmarkerModule({
       createFromOptions: vi.fn().mockResolvedValue(landmarker),
     });
 
-    await expect(faceLandmarkerModule.getFaceLandmarker()).resolves.toBe(landmarker);
-    await expect(faceLandmarkerModule.getFaceLandmarker()).resolves.toBe(landmarker);
+    const first = await faceLandmarkerModule.getFaceLandmarker();
+    const second = await faceLandmarkerModule.getFaceLandmarker();
+
+    expect(first).toBe(second);
 
     expect(faceLandmarkerModule.forVisionTasks).toHaveBeenCalledOnce();
     expect(faceLandmarkerModule.createFromOptions).toHaveBeenCalledOnce();
     expect(faceLandmarkerModule.createFromOptions).toHaveBeenCalledWith(
       { wasm: 'vision-fileset' },
       expect.objectContaining({
-        baseOptions: expect.objectContaining({ delegate: 'GPU' }),
+        baseOptions: expect.objectContaining({ delegate: 'CPU' }),
         runningMode: 'VIDEO',
         numFaces: 1,
       }),
     );
   });
 
-  it('falls back to CPU options when GPU creation fails', async () => {
-    const cpuLandmarker = { detectForVideo: vi.fn() };
-    const createFromOptions = vi.fn()
-      .mockRejectedValueOnce(new Error('GPU unavailable'))
-      .mockResolvedValueOnce(cpuLandmarker);
-    const faceLandmarkerModule = await loadFaceLandmarkerModule({ createFromOptions });
+  it('suppresses known MediaPipe native runtime logs during video detection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const landmarker = {
+      detectForVideo: vi.fn(() => {
+        console.error('INFO: Created TensorFlow Lite XNNPACK delegate for CPU.');
+        console.warn('W0510 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference.');
+        console.warn('W0510 face_landmarker_graph.cc:180] Sets FaceBlendshapesGraph acceleration to xnnpack by default.');
+        console.warn('real warning');
+        console.error('real error');
 
-    await expect(faceLandmarkerModule.getFaceLandmarker()).resolves.toBe(cpuLandmarker);
-
-    expect(createFromOptions).toHaveBeenCalledTimes(2);
-    expect(createFromOptions).toHaveBeenNthCalledWith(
-      2,
-      { wasm: 'vision-fileset' },
-      expect.objectContaining({
-        baseOptions: expect.not.objectContaining({ delegate: 'GPU' }),
+        return { faceLandmarks: [] };
       }),
-    );
+    };
+    const faceLandmarkerModule = await loadFaceLandmarkerModule({
+      createFromOptions: vi.fn().mockResolvedValue(landmarker),
+    });
+
+    const wrappedLandmarker = await faceLandmarkerModule.getFaceLandmarker();
+    const result = wrappedLandmarker.detectForVideo({} as HTMLVideoElement, 1000);
+
+    expect(result).toEqual({ faceLandmarks: [] });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('real warning');
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith('real error');
   });
 
   it('resets the cached promise after startup failure so callers can retry', async () => {
@@ -83,8 +95,10 @@ describe('MediaPipe face landmarker infrastructure adapter', () => {
     });
 
     await expect(faceLandmarkerModule.getFaceLandmarker()).rejects.toThrow('network offline');
-    await expect(faceLandmarkerModule.getFaceLandmarker()).resolves.toBe(recoveredLandmarker);
+    const wrappedLandmarker = await faceLandmarkerModule.getFaceLandmarker();
 
+    expect(wrappedLandmarker).not.toBe(recoveredLandmarker);
+    expect(wrappedLandmarker.detectForVideo).toEqual(expect.any(Function));
     expect(forVisionTasks).toHaveBeenCalledTimes(2);
   });
 });

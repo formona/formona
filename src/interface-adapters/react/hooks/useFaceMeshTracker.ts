@@ -162,15 +162,21 @@ export const useFaceMeshTracker = ({ ipdMm }: UseFaceMeshTrackerOptions): UseFac
 
         try {
           setTrackerStatus((status) => (status === 'ready' ? status : 'loading'));
+          const videoDimensions = video.videoWidth > 0 && video.videoHeight > 0
+            ? { width: video.videoWidth, height: video.videoHeight }
+            : null;
+
+          if (!videoDimensions) {
+            animationFrameRef.current = window.requestAnimationFrame(trackFrame);
+            return;
+          }
+
           const landmarker = await getFaceLandmarker();
           if (stoppedRef.current) return;
 
           const timestampMs = performance.now();
           const result = landmarker.detectForVideo(video, timestampMs);
           const detectedLandmarks = result.faceLandmarks[0] ?? [];
-          const videoDimensions = video.videoWidth > 0 && video.videoHeight > 0
-            ? { width: video.videoWidth, height: video.videoHeight }
-            : null;
           const trackingFrame = buildFaceTrackingFrameState({
             detectedLandmarks,
             ipdMm,
