@@ -1,0 +1,130 @@
+goal: Implement the Formona/MONABROW MVP demo in the existing ./monabrow Next.js prototype with real MediaPipe FaceMesh integration and mobile front-camera AR eyebrow recommendation flow
+task_type: code
+brownfield_context:
+  project_type: brownfield
+  context_references: []
+  existing_patterns:
+    - Next.js App Router prototype in monabrow/src/app
+    - Single client page currently holds most UI and simulated analysis
+  existing_dependencies:
+    - Next.js 16.2.6
+    - React 19
+    - TypeScript
+    - Tailwind CSS 4
+    - "@mediapipe/tasks-vision"
+    - motion
+    - lucide-react
+constraints:
+  - Must be based on ./monabrow prototype.
+  - Must satisfy the documented MVP flow from formona_plan.md.
+  - Mobile web front camera is the primary demo target.
+  - iPhone 12+ iOS Safari and Galaxy S21+ Android Chrome are both required acceptance environments.
+  - Desktop Chrome is development/support verification only.
+  - Accuracy may be MVP/demo level, not production tuned.
+  - Exclude login, history, payment, skin analysis, eyebrow color simulation, and device stencil integration.
+  - Use MONABROW BI-first design direction.
+  - "Use Pretendard, white background, Formona brown #4F2C1D, and secondary gray #727171."
+  - Original logo asset is not required yet; use a placeholder only where needed.
+  - Reuse the current Next/React/TypeScript/Tailwind stack unless a blocker is found.
+acceptance_criteria:
+  - Splash screen works.
+  - IPD can be entered and saved locally.
+  - Camera permission flow works, including denied-permission guidance.
+  - Mobile front camera opens on supported devices.
+  - Real-time face alignment guidance works.
+  - MediaPipe FaceMesh 468 landmarks are used for analysis.
+  - "Face shape is classified into four rule-based categories: oval, square, round, and heart."
+  - Each face shape returns three eyebrow recommendations.
+  - IPD-based px-to-mm conversion works.
+  - Recommended eyebrow AR overlay is rendered on the live camera view.
+  - Seven eyebrow metrics are displayed.
+  - Seven displayed metrics are SP, HP, EP, total eyebrow length, eyebrow thickness, arch height, and eyebrow gap.
+  - Metrics are calculated with FaceMesh/iris landmark-based approximations.
+  - Demo metric accuracy targets +/-3-5mm.
+  - Existing single-file prototype structure is cleaned up into maintainable modules.
+  - Test tooling is introduced.
+  - Buttons and UI are improved while preserving MONABROW BI constraints.
+ontology_schema:
+  name: MonabrowMvpDemo
+  description: Domain model for camera-based face analysis, face-shape classification, eyebrow recommendation, AR overlay, and measurement display.
+  fields:
+    - name: ipdMm
+      type: number
+      required: true
+      description: User-entered interpupillary distance in millimeters.
+    - name: cameraPermission
+      type: boolean
+      required: true
+      description: Whether camera access has been granted.
+    - name: deviceEnvironment
+      type: object
+      required: true
+      description: Target mobile browser and device context for demo validation.
+    - name: faceLandmarks
+      type: array
+      required: true
+      description: MediaPipe FaceMesh 468 landmark output used for analysis.
+    - name: faceAlignment
+      type: object
+      required: true
+      description: Real-time guidance state for positioning the face in the camera view.
+    - name: faceShape
+      type: string
+      required: true
+      description: Rule-based classification result among four supported face-shape categories.
+    - name: eyebrowRecommendations
+      type: array
+      required: true
+      description: Three recommended eyebrow styles for the detected face shape.
+    - name: selectedRecommendation
+      type: object
+      required: true
+      description: Eyebrow recommendation rendered as AR overlay.
+    - name: eyebrowMetrics
+      type: object
+      required: true
+      description: "Seven measured eyebrow values: SP, HP, EP, total length, thickness, arch height, and gap."
+    - name: pxToMmScale
+      type: number
+      required: true
+      description: Conversion ratio derived from IPD and detected landmark distance.
+    - name: arOverlay
+      type: object
+      required: true
+      description: Live camera overlay geometry for recommended eyebrow preview.
+evaluation_principles:
+  - name: MVP Completeness
+    weight: 0.35
+    description: All documented MVP flow steps must be present and demonstrably working.
+  - name: Real MediaPipe Integration
+    weight: 0.25
+    description: Analysis must use actual @mediapipe/tasks-vision FaceMesh landmarks rather than timeout, random, or mocked results.
+  - name: Mobile Demo Reliability
+    weight: 0.2
+    description: iPhone Safari and Android Chrome on required device classes must be prioritized over desktop polish.
+  - name: Measurement Plausibility
+    weight: 0.1
+    description: Seven metrics should use FaceMesh/iris approximations and aim for demo-level +/-3-5mm accuracy.
+  - name: Codebase Maintainability
+    weight: 0.1
+    description: Current prototype should be reorganized with cleaner structure, tests, and improved reusable UI controls.
+exit_conditions:
+  - name: MVP Demo Complete
+    description: All acceptance criteria work in the local ./monabrow app.
+    criteria: Manual verification passes on iPhone 12+ iOS Safari and Galaxy S21+ Android Chrome.
+  - name: No Mock Analysis Remaining
+    description: Prototype random/timeout analysis is replaced.
+    criteria: Face shape, metrics, scale, and overlay are derived from MediaPipe landmarks.
+  - name: Scope Boundary Preserved
+    description: Excluded features are not implemented.
+    criteria: No login, history, payment, skin analysis, eyebrow color, or device stencil integration is added.
+  - name: Validation Ready
+    description: Implementation is testable and maintainable.
+    criteria: Test tooling exists and core analysis/UI flow has appropriate verification coverage.
+metadata:
+  seed_id: seed_27614b073bc2
+  version: 1.0.0
+  created_at: "2026-05-10T14:53:00.158648Z"
+  ambiguity_score: 0.16
+  interview_id: interview_20260510_144125
+  parent_seed_id: null

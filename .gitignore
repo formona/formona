@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.npm-cache/
+.playwright-mcp/
+build/
+dist/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+*.tsbuildinfo
+*.zip
+.env*
+!.env.example
+!.env.test.example

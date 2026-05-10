@@ -1,0 +1,5 @@
+{
+  "name": "MONABROW",
+  "description": "AI-powered eyebrow analysis and AR styling experience for personalized beauty design.",
+  "requestFramePermissions": ["camera"]
+}
