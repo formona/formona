@@ -617,10 +617,29 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
 
     expect(screen.getByText('AR 캡처 대기: 기준점 신뢰도 낮음')).toBeInTheDocument();
     expect(screen.getByText('동공 기준점이 불안정해요')).toBeInTheDocument();
-    expect(screen.getByText('밝은 곳에서 얼굴을 고정하고 눈을 또렷하게 뜬 상태로 잠시 유지해주세요.')).toBeInTheDocument();
+    expect(screen.getAllByText('밝은 곳에서 얼굴을 고정하고 눈을 또렷하게 뜬 상태로 잠시 유지해주세요.')).toHaveLength(2);
     expect(screen.getAllByText('밝은 조명에서 정면을 보고 1초 정도 움직임을 멈춰주세요.')).toHaveLength(2);
     expect(screen.getByText('정렬 중')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '얼굴 정렬 필요' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '동공 기준점 확인 중' })).toBeDisabled();
+  });
+
+  it('does not label a front-facing pending analysis as an alignment problem', () => {
+    const { onAnalysisComplete, rerender } = renderCapturePage();
+
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      alignment: readyAlignment,
+      analysis: null,
+      ipdGuidance: null,
+      frameGuidance: null,
+    };
+    rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
+
+    expect(screen.getByText('분석 중')).toBeInTheDocument();
+    expect(screen.getByText('정면은 맞았습니다. 기준점이 안정되면 촬영 버튼이 활성화됩니다.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '분석 안정화 중' })).toBeDisabled();
   });
 
   it('surfaces fallback guidance when MediaPipe returns a missing eyebrow landmark frame', () => {
@@ -648,10 +667,10 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
 
     expect(screen.getByText('AR 캡처 대기: 기준점 누락')).toBeInTheDocument();
     expect(screen.getByText('눈썹 기준점을 찾고 있어요')).toBeInTheDocument();
-    expect(screen.getByText('앞머리, 손, 안경테가 눈썹을 가리지 않게 하고 양쪽 눈썹이 화면 안에 들어오도록 맞춰주세요.')).toBeInTheDocument();
+    expect(screen.getAllByText('앞머리, 손, 안경테가 눈썹을 가리지 않게 하고 양쪽 눈썹이 화면 안에 들어오도록 맞춰주세요.')).toHaveLength(2);
     expect(screen.getAllByText('앞머리, 손, 안경테를 치우고 양쪽 눈썹과 눈이 모두 보이게 맞춰주세요.')).toHaveLength(2);
     expect(screen.getByText('정렬 중')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '얼굴 정렬 필요' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '기준점 확인 중' })).toBeDisabled();
   });
 
   it('renders the recommendation-ready state and selects an AR preview style', () => {

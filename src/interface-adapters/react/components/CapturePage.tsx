@@ -95,6 +95,49 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
     const recommendationState = buildEyebrowRecommendationState(analysis);
     return recommendationState.status === 'ready' ? recommendationState.recommendations[0] ?? null : null;
   }, [captureReady, analysis]);
+  const captureBlockedState = useMemo(() => {
+    if (captureReady) return null;
+
+    if (!alignment.detected || frameGuidance?.reason === 'missing_face') {
+      return {
+        label: '얼굴 정렬 필요',
+        description: '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.',
+      };
+    }
+
+    if (frameGuidance?.reason === 'low_confidence') {
+      return {
+        label: '기준점 안정화 중',
+        description: frameGuidance.message,
+      };
+    }
+
+    if (frameGuidance) {
+      return {
+        label: '기준점 확인 중',
+        description: frameGuidance.message,
+      };
+    }
+
+    if (ipdGuidance) {
+      return {
+        label: '동공 기준점 확인 중',
+        description: ipdGuidance.message,
+      };
+    }
+
+    if (alignmentReady) {
+      return {
+        label: '분석 안정화 중',
+        description: '정면은 맞았습니다. 기준점이 안정되면 촬영 버튼이 활성화됩니다.',
+      };
+    }
+
+    return {
+      label: '얼굴 위치 조정',
+      description: alignment.guidance || '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.',
+    };
+  }, [alignment.detected, alignment.guidance, alignmentReady, captureReady, frameGuidance, ipdGuidance]);
   const PermissionIcon = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_ICONS[cameraPermission];
 
   return (
@@ -145,6 +188,8 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
         <Controls
           mode="capture"
           analysisReady={captureReady}
+          disabledLabel={captureBlockedState?.label}
+          disabledDescription={captureBlockedState?.description}
           onCapture={handleCapture}
           onFileUpload={handleFileUpload}
         />

@@ -17,6 +17,8 @@ type PermissionControlsProps = {
 type CaptureControlsProps = {
   mode: 'capture';
   analysisReady: boolean;
+  disabledLabel?: string;
+  disabledDescription?: string;
   onCapture: () => void;
   onFileUpload: FileUploadHandler;
 };
@@ -54,12 +56,15 @@ export const Controls = (props: ControlsProps) => {
   }
 
   if (props.mode === 'capture') {
-    const captureLabel = props.analysisReady ? '촬영하고 추천 보기' : '얼굴 정렬 필요';
+    const captureLabel = props.analysisReady ? '촬영하고 추천 보기' : props.disabledLabel ?? '얼굴 정렬 필요';
+    const captureDescription = props.analysisReady
+      ? '준비가 완료되었습니다. 촬영하면 추천 단계로 이동합니다.'
+      : props.disabledDescription ?? '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.';
 
     return (
       <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-main-brown/10 bg-white/[0.94] px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4 shadow-[0_-12px_34px_rgba(79,44,29,0.10)] backdrop-blur-xl">
         <p className="mb-3 text-center text-[12px] font-medium leading-relaxed text-sub-gray">
-          {props.analysisReady ? '준비가 완료되었습니다. 촬영하면 추천 단계로 이동합니다.' : '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.'}
+          {captureDescription}
         </p>
         <div className="flex w-full gap-3">
           <label className="btn btn-secondary btn-icon cursor-pointer shrink-0" aria-label="이미지 수동 업로드">

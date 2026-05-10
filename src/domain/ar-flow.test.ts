@@ -79,6 +79,14 @@ const makeLandmarks = (overrides: Record<number, FacePoint> = {}) => {
   return landmarks;
 };
 
+const withLandmarkConfidence = (landmarks: FacePoint[], confidence: number) => (
+  landmarks.map((point) => ({
+    ...point,
+    presence: confidence,
+    visibility: confidence,
+  }))
+);
+
 describe('AR flow utilities', () => {
   it('extracts face width, face height, jaw width, cheek width, and forehead width from FaceMesh landmarks', () => {
     const dimensions = extractFaceDimensions(makeLandmarks());
@@ -242,6 +250,22 @@ describe('AR flow utilities', () => {
     expect(result?.overlay.viewBox).toBe('0 0 100 100');
     expect(result?.overlay.left).toContain('Q');
     expect(result?.overlay.right).toContain('Q');
+  });
+
+  it('accepts front-facing landmarks with high but imperfect MediaPipe confidence', () => {
+    const landmarks = withLandmarkConfidence(makeLandmarks(), 0.82);
+    const validation = validateLandmarkFrame(extractFaceFeatureLandmarks(landmarks));
+    const result = analyzeFaceLandmarks(landmarks, 63, { width: 1080, height: 1920 });
+
+    expect(validation).toMatchObject({
+      valid: true,
+      confidence: 0.82,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.alignment.ready).toBe(true);
+    expect(result?.metricConfidence?.reportable).toBe(true);
+    expect(result?.eyebrowPosition.confidence).toBeCloseTo(0.82);
+    expect(result?.eyeGeometry.confidence).toBeCloseTo(0.82);
   });
 
   it('builds eyebrow overlay anchors from representative landmark positions', () => {
