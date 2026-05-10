@@ -173,7 +173,6 @@ export const validateEyebrowRecommendationContext = (
   if (!context) return validationResult('missing_analysis');
   if (!hasCompleteMetricShape(context.metrics)) return validationResult('missing_metrics');
   if (!hasValidMetricValues(context.metrics)) return validationResult('invalid_metrics');
-  if (context.metricConfidence && !context.metricConfidence.reportable) return validationResult('low_confidence');
 
   if (
     !context.normalizedGeometry

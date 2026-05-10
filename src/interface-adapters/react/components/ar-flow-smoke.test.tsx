@@ -565,6 +565,30 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByRole('button', { name: '촬영하고 추천 보기' })).toBeEnabled();
   });
 
+  it('allows capture when analysis exists even if metric reportability is low', () => {
+    const { onAnalysisComplete, rerender } = renderCapturePage();
+    const lowReportabilityAnalysis = {
+      ...makeAnalysis(),
+      metricConfidence: makeMetricConfidence({
+        reportable: false,
+        overallConfidence: 0.72,
+        maxEstimatedErrorMm: 5.6,
+      }),
+    };
+
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      alignment: readyAlignment,
+      analysis: lowReportabilityAnalysis,
+    };
+    rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
+
+    expect(screen.getByText('촬영 가능')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '촬영하고 추천 보기' })).toBeEnabled();
+  });
+
   it('surfaces AR fallback guidance when no face is visible', () => {
     const { onAnalysisComplete, rerender } = renderCapturePage();
 
@@ -829,7 +853,6 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByText(/예상 오차 최대 \+\/-5.6mm/)).toBeInTheDocument();
     expect(screen.queryByText('18.2mm')).not.toBeInTheDocument();
     expect(screen.queryByText('50.2mm')).not.toBeInTheDocument();
-    expect(screen.getByText('기준점 신뢰도가 낮아요')).toBeInTheDocument();
     expect(screen.getAllByText('-')).toHaveLength(7);
   });
 });

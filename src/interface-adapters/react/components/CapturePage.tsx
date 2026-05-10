@@ -84,11 +84,10 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
     reader.readAsDataURL(file);
   };
 
-  const metricsReportable = analysis?.metricConfidence?.reportable ?? Boolean(analysis);
   const alignmentReady = Boolean(alignment.ready ?? (
     alignment.detected && alignment.centered && alignment.distanceOk && alignment.pitchOk && alignment.yawOk
   ));
-  const captureReady = Boolean(analysis && metricsReportable);
+  const captureReady = Boolean(analysis);
   const liveRecommendation = useMemo(() => {
     if (!captureReady) return null;
 
