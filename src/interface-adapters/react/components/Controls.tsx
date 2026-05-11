@@ -62,20 +62,20 @@ export const Controls = (props: ControlsProps) => {
       : props.disabledDescription ?? '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.';
 
     return (
-      <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-main-brown/10 bg-white/[0.94] px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4 shadow-[0_-12px_34px_rgba(79,44,29,0.10)] backdrop-blur-xl">
-        <p className="mb-3 text-center text-[12px] font-medium leading-relaxed text-sub-gray">
+      <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-main-brown/10 bg-white/[0.94] px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_34px_rgba(79,44,29,0.10)] backdrop-blur-xl">
+        <p className="mb-2 text-center text-[11px] font-medium leading-snug text-sub-gray">
           {captureDescription}
         </p>
-        <div className="flex w-full gap-3">
+        <div className="flex w-full gap-2.5">
           <label className="btn btn-secondary btn-icon cursor-pointer shrink-0" aria-label="이미지 수동 업로드">
-            <Upload size={22} className="text-main-brown opacity-60" />
+            <Upload size={20} className="text-main-brown opacity-60" />
             <input type="file" accept="image/*" className="hidden" onChange={props.onFileUpload} />
           </label>
           <button
             type="button"
             onClick={props.onCapture}
             disabled={!props.analysisReady}
-            className="btn btn-primary min-h-[62px] flex-1 text-[17px]"
+            className="btn btn-primary min-h-[56px] flex-1 text-[16px]"
           >
             {captureLabel}
           </button>

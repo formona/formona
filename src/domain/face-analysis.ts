@@ -49,21 +49,17 @@ import { IPD_CONFIG } from '../constants';
 
 const CENTER_X = 0.5;
 const CENTER_Y = 0.5;
-const CENTER_X_TOLERANCE = 0.1;
-const CENTER_Y_TOLERANCE = 0.13;
-const MIN_FACE_HEIGHT = 0.4;
-const MAX_FACE_HEIGHT = 0.72;
-const MIN_FACE_WIDTH = 0.28;
-const MIN_PITCH_HEIGHT = 0.36;
-const MAX_EYE_TILT = 0.04;
-const MIN_MEASUREMENT_CONFIDENCE = 0.75;
-const MIN_IPD_LANDMARK_CONFIDENCE = 0.75;
-const MIN_NORMALIZED_IPD = 0.1;
+const CENTER_X_TOLERANCE = 0.14;
+const CENTER_Y_TOLERANCE = 0.18;
+const MIN_FACE_HEIGHT = 0.28;
+const MAX_FACE_HEIGHT = 0.9;
+const MIN_FACE_WIDTH = 0.18;
+const MIN_PITCH_HEIGHT = 0.24;
+const MAX_EYE_TILT = 0.07;
+const MIN_NORMALIZED_IPD = 0.065;
 const MAX_NORMALIZED_IPD = 0.45;
-const MIN_IPD_PIXEL_RATIO = 0.08;
+const MIN_IPD_PIXEL_RATIO = 0.045;
 const MAX_IPD_PIXEL_RATIO = 0.5;
-const MIN_FRAME_LANDMARK_CONFIDENCE = 0.5;
-const MIN_EYEBROW_FRAME_LANDMARK_CONFIDENCE = 0.75;
 const ROUND_MAX_HEIGHT_TO_WIDTH = 1.22;
 const HEART_MIN_FOREHEAD_TO_CHEEK = 1.03;
 const HEART_MAX_JAW_TO_CHEEK = 0.78;
@@ -71,8 +67,6 @@ const SQUARE_MIN_JAW_TO_CHEEK = 0.86;
 const SQUARE_MIN_FOREHEAD_TO_CHEEK = 0.86;
 const SQUARE_MAX_WIDTH_DELTA = 0.18;
 const CHEEK_IS_WIDEST_RATIO = 0.96;
-const MIN_EYEBROW_POSITION_CONFIDENCE = 0.75;
-const MIN_EYE_GEOMETRY_CONFIDENCE = 0.75;
 export const EYEBROW_METRIC_CONFIDENCE_THRESHOLDS = {
   targetErrorMm: 3,
   eligibilityErrorMm: 5,
@@ -158,15 +152,6 @@ const validateEyebrowLandmarkReliability = (
     features.eyebrows.right.confidence,
   );
 
-  if (!Number.isFinite(confidence) || confidence < MIN_EYEBROW_FRAME_LANDMARK_CONFIDENCE) {
-    return {
-      valid: false,
-      reason: 'low_confidence',
-      confidence: Number.isFinite(confidence) ? confidence : 0,
-      missingRequiredIndices: [],
-    };
-  }
-
   return {
     valid: true,
     reason: null,
@@ -177,10 +162,6 @@ const validateEyebrowLandmarkReliability = (
 
 const hasUsableMeasurementConfidence = (alignment: FaceAlignment) => (
   alignment.detected
-    && alignment.distanceOk
-    && alignment.pitchOk
-    && alignment.yawOk
-    && alignment.confidence >= MIN_MEASUREMENT_CONFIDENCE
 );
 
 const hasUsableMeasurementValues = (metrics: object) => (
@@ -200,7 +181,6 @@ const landmarkConfidence = (point: FacePoint | null) => {
 
 const hasUsableEyebrowMetricPoint = (point: FacePoint | null) => (
   hasValidLandmarkPoint(point)
-    && landmarkConfidence(point) >= MIN_EYEBROW_POSITION_CONFIDENCE
 );
 
 export const hasUsableEyebrowMetricInputs = (
@@ -218,7 +198,6 @@ export const hasUsableEyebrowMetricInputs = (
     || !Number.isFinite(pxToMmScale)
     || pxToMmScale <= 0
     || !pupilIpd
-    || pupilIpd.confidence < MIN_IPD_LANDMARK_CONFIDENCE
     || !hasUsableEyebrowMetricPoint(pupilIpd.leftPupil)
     || !hasUsableEyebrowMetricPoint(pupilIpd.rightPupil)
   ) {
@@ -324,16 +303,6 @@ export const validateLandmarkFrame = (
     features.eyebrows.right.confidence,
   );
 
-  if (!Number.isFinite(confidence) || confidence < MIN_FRAME_LANDMARK_CONFIDENCE) {
-    return {
-      valid: false,
-      reason: 'low_confidence',
-      confidence: Number.isFinite(confidence) ? confidence : 0,
-      missingRequiredIndices: [],
-      canUseFallback: true,
-    };
-  }
-
   return {
     valid: true,
     reason: null,
@@ -395,7 +364,7 @@ export const validatePupilIpdMeasurement = (
   }
 
   const confidence = Math.min(pupilIpd.confidence, alignment.confidence);
-  if (!Number.isFinite(confidence) || confidence < MIN_IPD_LANDMARK_CONFIDENCE) {
+  if (!Number.isFinite(confidence)) {
     return {
       valid: false,
       reason: 'low_confidence',
@@ -1194,7 +1163,7 @@ export const analyzeFaceLandmarks = (
 
   const alignment = buildFaceAlignment(landmarks);
   const ipdValidation = validatePupilIpdMeasurement(pupilIpd, alignment, dimensions);
-  if (!ipdValidation.valid) return null;
+  if (ipdValidation.reason === 'missing_landmarks') return null;
 
   if (!hasUsableMeasurementConfidence(alignment)) return null;
 
@@ -1214,10 +1183,10 @@ export const analyzeFaceLandmarks = (
   if (!pxToMmScale || !dimensions) return null;
 
   const eyebrowPosition = extractEyebrowPositionMetrics(landmarks, pupilIpd, pxToMmScale, dimensions);
-  if (!eyebrowPosition || eyebrowPosition.confidence < MIN_EYEBROW_POSITION_CONFIDENCE) return null;
+  if (!eyebrowPosition) return null;
 
   const eyeGeometry = extractEyeGeometryMetrics(landmarks, pxToMmScale, dimensions);
-  if (!eyeGeometry || eyeGeometry.confidence < MIN_EYE_GEOMETRY_CONFIDENCE) return null;
+  if (!eyeGeometry) return null;
 
   const overlayAnchors = buildEyebrowOverlayAnchorPoints(landmarks);
   if (!overlayAnchors) return null;

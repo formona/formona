@@ -94,10 +94,14 @@ export const FaceGuidance = ({
           animate={{
             scale: aligned ? 1.04 : 1,
             borderColor: guideColor,
-            boxShadow: aligned ? '0 0 20px rgba(74,222,128,0.4)' : faceDetected ? '0 0 18px rgba(245,158,11,0.35)' : 'none',
+            boxShadow: aligned
+              ? '0 0 20px rgba(74,222,128,0.4)'
+              : faceDetected
+                ? '0 0 18px rgba(245,158,11,0.35)'
+                : '0 0 0 rgba(255,255,255,0)',
           }}
           className={cn(
-            "w-[74%] h-[60%] border-[3px] rounded-[100%]",
+            "h-[50%] w-[68%] rounded-[100%] border-[3px]",
             !faceDetected && "border-dashed"
           )}
           id="face-guide"
@@ -105,53 +109,53 @@ export const FaceGuidance = ({
         />
       </div>
 
-      <div className="absolute left-4 right-4 top-4 flex justify-center">
-        <div className="glass-pill max-w-full rounded-full border-glass-border px-5 py-3 shadow-sm">
-          <p aria-live="polite" className="truncate text-[14px] font-bold tracking-tight text-main-brown">
+      <div className="absolute left-3 right-3 top-3 flex justify-center">
+        <div className="glass-pill max-w-full rounded-full border-glass-border px-3.5 py-2 shadow-sm">
+          <p aria-live="polite" className="truncate text-[12px] font-bold tracking-tight text-main-brown">
             {guidanceMessage}
           </p>
         </div>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-4 space-y-3">
+      <div className="absolute bottom-3 left-3 right-3 space-y-2">
         {fallbackState && (
           <div
             role="status"
             aria-live="polite"
             className={cn(
-              "rounded-[22px] border bg-white/[0.94] px-4 py-3 text-main-brown shadow-sm backdrop-blur-md",
+              "rounded-[18px] border bg-white/[0.94] px-3 py-2.5 text-main-brown shadow-sm backdrop-blur-md",
               fallbackState.kind === 'no-face' ? "border-main-brown/20" : "border-amber-400/35"
             )}
           >
-            <p className="flex flex-wrap items-center gap-2 text-[12px] font-bold">
+            <p className="flex min-w-0 items-center gap-2 text-[11px] font-bold">
               <AlertCircle
-                size={15}
+                size={14}
                 className={cn(
                   "shrink-0",
                   fallbackState.kind === 'no-face' ? "text-main-brown/55" : "text-amber-500"
                 )}
               />
-              <span className="rounded-full bg-main-brown/8 px-2 py-0.5 text-[10px] font-bold text-main-brown">
+              <span className="shrink-0 rounded-full bg-main-brown/8 px-2 py-0.5 text-[9px] font-bold text-main-brown">
                 AR 캡처 대기: {fallbackState.label}
               </span>
-              <span>{fallbackState.title}</span>
+              <span className="min-w-0 truncate">{fallbackState.title}</span>
             </p>
-            <p className="mt-1 text-[11px] font-medium leading-relaxed text-sub-gray">
+            <p className="mt-1 text-[10px] font-medium leading-snug text-sub-gray">
               {fallbackState.message}
             </p>
-            <p className="mt-2 text-[11px] font-bold leading-relaxed text-main-brown">
+            <p className="mt-1 text-[10px] font-bold leading-relaxed text-main-brown">
               {fallbackState.action}
             </p>
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-main-brown/10 bg-white/[0.82] px-4 py-3 shadow-sm backdrop-blur-md">
-          <p className="flex min-w-[128px] flex-1 items-center gap-2 text-[12px] font-bold text-main-brown">
-            {aligned ? <CheckCircle2 size={15} className="shrink-0" /> : faceDetected ? <MoveHorizontal size={15} className="shrink-0" /> : <ScanFace size={15} className="shrink-0" />}
+        <div className="flex items-center justify-between gap-2 rounded-[18px] border border-main-brown/10 bg-white/[0.82] px-3 py-2.5 shadow-sm backdrop-blur-md">
+          <p className="flex min-w-[112px] flex-1 items-center gap-2 text-[11px] font-bold text-main-brown">
+            {aligned ? <CheckCircle2 size={14} className="shrink-0" /> : faceDetected ? <MoveHorizontal size={14} className="shrink-0" /> : <ScanFace size={14} className="shrink-0" />}
             <span className="truncate">{statusLabel}</span>
           </p>
           {detectedFaceShape && (
             <span
-              className="shrink-0 rounded-full bg-main-brown/8 px-2.5 py-1 text-[11px] font-bold text-main-brown"
+              className="shrink-0 rounded-full bg-main-brown/8 px-2 py-0.5 text-[10px] font-bold text-main-brown"
               aria-label={`감지된 얼굴형 ${detectedFaceShape}`}
             >
               {detectedFaceShape} 감지

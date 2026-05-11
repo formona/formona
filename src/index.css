@@ -20,6 +20,10 @@
     -webkit-font-smoothing: antialiased;
     letter-spacing: 0px;
   }
+
+  nextjs-portal {
+    display: none !important;
+  }
 }
 
 /* MONABROW Glassmorphism */
