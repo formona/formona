@@ -24,6 +24,7 @@ interface FaceGuidanceProps {
   detectedFaceShape?: FaceShape | null;
   ipdGuidance?: IpdMeasurementGuidance | null;
   frameGuidance?: LandmarkFrameGuidance | null;
+  mode?: 'capture' | 'preview';
 }
 
 const getCaptureFallbackState = (
@@ -73,6 +74,7 @@ export const FaceGuidance = ({
   detectedFaceShape = null,
   ipdGuidance = null,
   frameGuidance = null,
+  mode = 'capture',
 }: FaceGuidanceProps) => {
   const faceDetected = alignment.detected;
   const fallbackState = getCaptureFallbackState(frameGuidance, ipdGuidance);
@@ -81,6 +83,7 @@ export const FaceGuidance = ({
   ));
   const statusLabel = trackerStatus === 'ready' ? 'FaceMesh 추적 중' : 'FaceMesh 준비 중';
   const guidanceMessage = fallbackState?.action ?? (faceDetected ? alignment.guidance : '정면을 바라봐 주세요');
+  const fallbackPrefix = mode === 'preview' ? 'AR 미리보기 대기' : 'AR 캡처 대기';
   const guideColor = aligned
     ? BRAND_COLORS.faceGuideDetected
     : faceDetected
@@ -136,7 +139,7 @@ export const FaceGuidance = ({
                 )}
               />
               <span className="shrink-0 rounded-full bg-main-brown/8 px-2 py-0.5 text-[9px] font-bold text-main-brown">
-                AR 캡처 대기: {fallbackState.label}
+                {fallbackPrefix}: {fallbackState.label}
               </span>
               <span className="min-w-0 truncate">{fallbackState.title}</span>
             </p>

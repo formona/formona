@@ -792,6 +792,40 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByText(analysis.faceShape)).toBeInTheDocument();
   });
 
+  it('renders the AR recommendation preview from the live camera instead of the captured photo', () => {
+    const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
+    const selectedStyle = recommendations[0]!;
+    const analysis = makeAnalysis();
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      alignment: readyAlignment,
+      detectedFaceShape: FaceShape.OVAL,
+      analysis,
+      liveOverlayAnchors: mockOverlayAnchors,
+    };
+
+    const { container } = render(
+      <ResultPage
+        faceShape={FaceShape.OVAL}
+        capturedImage="data:image/jpeg;base64,monabrow"
+        analysis={analysis}
+        recommendationContext={buildEyebrowRecommendationContext(analysis)}
+        selectedStyle={selectedStyle}
+        onSelectedStyleChange={vi.fn()}
+        onRetry={vi.fn()}
+        onApplyStyle={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByAltText('분석 촬영 이미지')).not.toBeInTheDocument();
+    expect(container.querySelector('video')).toBeInTheDocument();
+    expect(screen.getByTestId('camera-ar-overlay')).toBeInTheDocument();
+    expect(screen.getByText('LIVE AR')).toBeInTheDocument();
+    expect(screen.getByText(`${selectedStyle.name} 실시간 트레이싱 중`)).toBeInTheDocument();
+  });
+
   it('displays all seven eyebrow metrics in the AR recommendation UI', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
     const selectedStyle = recommendations[0]!;

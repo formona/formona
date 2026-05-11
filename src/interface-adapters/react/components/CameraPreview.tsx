@@ -41,6 +41,9 @@ interface CameraPreviewProps {
   onRequestCameraPermission: () => void;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   className?: string;
+  showPermissionFileUpload?: boolean;
+  showFaceGuidance?: boolean;
+  guidanceMode?: 'capture' | 'preview';
 }
 
 interface FaceLocalBrowControlPoints {
@@ -69,6 +72,9 @@ export const CameraPreview = ({
   onRequestCameraPermission,
   onFileUpload,
   className,
+  showPermissionFileUpload = true,
+  showFaceGuidance = true,
+  guidanceMode = 'capture',
 }: CameraPreviewProps) => {
   const permissionCopy = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_COPY[cameraPermission];
   const previewFrameRef = useRef<HTMLDivElement>(null);
@@ -345,6 +351,7 @@ export const CameraPreview = ({
               cameraPermission={cameraPermission}
               onRequestCameraPermission={onRequestCameraPermission}
               onFileUpload={onFileUpload}
+              allowFileUpload={showPermissionFileUpload}
             />
           </div>
         ) : (
@@ -365,13 +372,16 @@ export const CameraPreview = ({
                 canShowLiveOverlay ? "opacity-100" : "opacity-0"
               )}
             />
-            <FaceGuidance
-              alignment={alignment}
-              trackerStatus={trackerStatus}
-              detectedFaceShape={detectedFaceShape}
-              ipdGuidance={ipdGuidance}
-              frameGuidance={frameGuidance}
-            />
+            {showFaceGuidance && (
+              <FaceGuidance
+                alignment={alignment}
+                trackerStatus={trackerStatus}
+                detectedFaceShape={detectedFaceShape}
+                ipdGuidance={ipdGuidance}
+                frameGuidance={frameGuidance}
+                mode={guidanceMode}
+              />
+            )}
           </>
         )}
       </div>
