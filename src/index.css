@@ -185,6 +185,102 @@
   position: relative;
 }
 
+.app-container.ipd-page {
+  justify-content: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: max(24px, env(safe-area-inset-top)) 32px max(24px, env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+
+.ipd-card {
+  padding: 48px;
+  border-radius: 52px;
+}
+
+.ipd-header {
+  margin-top: 16px;
+  margin-bottom: 28px;
+}
+
+.ipd-input-section {
+  margin-bottom: 52px;
+}
+
+@media (max-height: 720px) {
+  .app-container.ipd-page {
+    justify-content: flex-start;
+    padding: max(18px, env(safe-area-inset-top)) 24px max(18px, env(safe-area-inset-bottom));
+  }
+
+  .ipd-card {
+    padding: 32px 28px;
+    border-radius: 40px;
+  }
+
+  .ipd-header {
+    margin-top: 0;
+    margin-bottom: 18px;
+  }
+
+  .ipd-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
+  }
+
+  .ipd-input {
+    font-size: 60px;
+    line-height: 1;
+  }
+
+  .ipd-input-section {
+    margin-bottom: 28px;
+  }
+}
+
+@media (max-height: 620px) {
+  .app-container.ipd-page {
+    padding: max(14px, env(safe-area-inset-top)) 20px max(14px, env(safe-area-inset-bottom));
+  }
+
+  .ipd-card {
+    padding: 24px;
+    border-radius: 32px;
+  }
+
+  .ipd-header {
+    margin-bottom: 14px;
+  }
+
+  .ipd-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 10px;
+  }
+
+  .ipd-header h2 {
+    font-size: 22px;
+    line-height: 1.18;
+  }
+
+  .ipd-input {
+    font-size: 52px;
+  }
+
+  .ipd-input-section {
+    margin-bottom: 18px;
+  }
+
+  .ipd-page .btn-compact {
+    min-height: 44px;
+  }
+
+  .ipd-page .btn-primary {
+    min-height: 52px;
+  }
+}
+
 .content-scrollable {
   flex: 1;
   overflow-y: auto;

@@ -199,18 +199,18 @@ export default function HomePage() {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="app-container p-8 justify-center"
+      className="app-container ipd-page"
     >
-      <div className="glass p-12 rounded-[52px] w-full text-center relative overflow-hidden">
-        <div className="space-y-4 mt-[16px] mb-[28px]">
-          <div className="w-16 h-16 bg-white/60 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-glass-border shadow-sm">
+      <div className="glass ipd-card w-full text-center relative overflow-hidden">
+        <div className="ipd-header space-y-4">
+          <div className="ipd-icon w-16 h-16 bg-white/60 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-glass-border shadow-sm">
             <span className="text-2xl">👁</span>
           </div>
           <h2 className="text-2xl font-bold text-main-brown tracking-tight">동공 간격(IPD) 입력</h2>
           <p className="text-sub-gray text-[14px] font-light leading-relaxed">보다 정밀한 가상 메이크업을 위해<br />본인의 동공 간격을 입력해주세요.</p>
         </div>
 
-        <div className="relative pt-[4px] pb-2 mb-[52px]">
+        <div className="ipd-input-section relative pt-[4px] pb-2">
           <input
             type="number"
             inputMode="decimal"
@@ -226,7 +226,7 @@ export default function HomePage() {
             onBlur={saveIpd}
             aria-label="동공 간격 밀리미터"
             aria-invalid={ipdInputError}
-            className="w-full text-center text-7xl font-bold bg-transparent border-0 outline-none text-main-brown tracking-tighter"
+            className="ipd-input w-full text-center text-7xl font-bold bg-transparent border-0 outline-none text-main-brown tracking-tighter"
             placeholder={String(IPD_CONFIG.defaultMm)}
           />
           <span className="block mt-2 text-main-brown/40 font-bold text-sm tracking-widest uppercase">Millimeters</span>
