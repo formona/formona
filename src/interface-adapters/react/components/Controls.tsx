@@ -12,6 +12,7 @@ type PermissionControlsProps = {
   cameraPermission: Exclude<CameraPermissionState, 'granted'>;
   onRequestCameraPermission: () => void;
   onFileUpload: FileUploadHandler;
+  allowFileUpload?: boolean;
 };
 
 type CaptureControlsProps = {
@@ -45,7 +46,7 @@ export const Controls = (props: ControlsProps) => {
         >
           {permissionCopy.actionLabel}
         </button>
-        {props.cameraPermission !== 'idle' && (
+        {props.allowFileUpload !== false && props.cameraPermission !== 'idle' && (
           <label className="btn btn-secondary btn-compact cursor-pointer">
             이미지 수동 업로드
             <input type="file" accept="image/*" className="hidden" onChange={props.onFileUpload} />

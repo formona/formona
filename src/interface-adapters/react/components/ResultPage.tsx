@@ -1,19 +1,22 @@
 "use client";
 
-import Image from 'next/image';
-import { AnimatePresence, motion } from 'motion/react';
-import { BRAND_COLORS } from '../../../constants';
-import { buildRecommendedEyebrowGeometry } from '../../../domain/eyebrow-geometry';
+import { useEffect, useRef, type ComponentType } from 'react';
+import { motion } from 'motion/react';
+import { AlertCircle, Camera, Loader2, Settings } from 'lucide-react';
+import { IPD_CONFIG } from '../../../constants';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../../domain/measurement-copy';
 import { buildEyebrowRecommendationState, buildEyebrowRecommendationStateFromContext } from '../../../usecases/eyebrow-recommendations';
 import { cn } from '../utils';
 import {
+  type CameraPermissionState,
   FaceShape,
   type EyebrowRecommendationContext,
   type EyebrowStyle,
   type FaceAnalysisResult,
   type MeasurementDisplayItem,
 } from '../../../types';
+import { useFaceMeshTracker } from '../hooks/useFaceMeshTracker';
+import { CameraPreview } from './CameraPreview';
 import { Controls } from './Controls';
 import { EyebrowStyleCarousel } from './EyebrowStyleCarousel';
 
@@ -27,6 +30,13 @@ interface ResultPageProps {
   onRetry: () => void;
   onApplyStyle: () => void;
 }
+
+const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>, ComponentType<{ size?: number; className?: string }>> = {
+  idle: Camera,
+  pending: Loader2,
+  denied: Settings,
+  unavailable: AlertCircle,
+};
 
 const getFaceShapeStatus = (faceShape: FaceShape | null, analysis: FaceAnalysisResult | null) => {
   if (!analysis) {
@@ -81,9 +91,26 @@ const getMeasurementGateMessage = (analysis: FaceAnalysisResult | null) => {
   return `기준점 신뢰도 ${Math.round(confidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${confidence.maxEstimatedErrorMm.toFixed(1)}mm로 측정값 표시 기준을 넘었습니다.`;
 };
 
+const getLivePreviewMessage = ({
+  cameraPermission,
+  alignment,
+  hasLiveOverlay,
+  selectedStyle,
+}: {
+  cameraPermission: CameraPermissionState;
+  alignment: FaceAnalysisResult['alignment'];
+  hasLiveOverlay: boolean;
+  selectedStyle: EyebrowStyle | null;
+}) => {
+  if (cameraPermission !== 'granted') return '카메라를 다시 연결해 현재 모습으로 AR 미리보기를 준비합니다.';
+  if (!alignment.detected) return '얼굴을 화면 중앙에 맞추면 추천 눈썹이 실시간으로 표시됩니다.';
+  if (!alignment.ready) return alignment.guidance || '정면을 보고 잠시 고정하면 추천 눈썹이 표시됩니다.';
+  if (!hasLiveOverlay) return '눈썹 기준점을 추적하고 있습니다. 얼굴과 눈썹이 화면 안에 보이게 맞춰주세요.';
+  return `${selectedStyle?.name ?? '추천 눈썹'} 실시간 트레이싱 중`;
+};
+
 export function ResultPage({
   faceShape,
-  capturedImage,
   analysis,
   recommendationContext,
   selectedStyle,
@@ -91,15 +118,43 @@ export function ResultPage({
   onRetry,
   onApplyStyle,
 }: ResultPageProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const recommendationState = recommendationContext
     ? buildEyebrowRecommendationStateFromContext(recommendationContext)
     : buildEyebrowRecommendationState(analysis);
   const recommendations = recommendationState.status === 'ready' ? recommendationState.recommendations : [];
   const measurements = buildDisplayedMeasurements(analysis);
   const measurementGateMessage = getMeasurementGateMessage(analysis);
-  const overlay = buildRecommendedEyebrowGeometry(selectedStyle, analysis?.overlayAnchors) ?? analysis?.overlay;
-  const hasTrackedOverlay = Boolean(overlay?.left || overlay?.right);
-  const faceShapeStatus = getFaceShapeStatus(faceShape ?? analysis?.faceShape ?? null, analysis);
+  const previewIpdMm = recommendationContext?.ipdMm ?? analysis?.ipdMm ?? IPD_CONFIG.defaultMm;
+  const {
+    videoRef,
+    cameraPermission,
+    trackerStatus,
+    latestLandmarks,
+    liveOverlayAnchors,
+    detectedFaceShape,
+    alignment,
+    ipdGuidance,
+    frameGuidance,
+    errorMessage,
+    requestCameraPermission,
+  } = useFaceMeshTracker({ ipdMm: previewIpdMm });
+  const PermissionIcon = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_ICONS[cameraPermission];
+  const liveFaceShape = detectedFaceShape ?? faceShape ?? analysis?.faceShape ?? null;
+  const faceShapeStatus = getFaceShapeStatus(liveFaceShape, analysis);
+  const hasLiveOverlay = Boolean(cameraPermission === 'granted' && alignment.ready && liveOverlayAnchors && selectedStyle);
+  const livePreviewMessage = getLivePreviewMessage({
+    cameraPermission,
+    alignment,
+    hasLiveOverlay,
+    selectedStyle,
+  });
+
+  useEffect(() => {
+    if (cameraPermission !== 'idle') return;
+
+    void requestCameraPermission();
+  }, [cameraPermission, requestCameraPermission]);
 
   return (
     <motion.div
@@ -109,91 +164,32 @@ export function ResultPage({
     >
       <div className="absolute left-0 right-0 top-0 z-0 flex h-[min(62dvh,560px)] flex-col items-center overflow-hidden">
         <div className="mt-20 mb-4 flex w-full justify-center px-6">
-            <div className="relative h-[min(46dvh,410px)] max-h-[410px] max-w-full aspect-[3/4] overflow-hidden rounded-lg border border-glass-border bg-white shadow-2xl">
-              {capturedImage && (
-                <Image
-                  src={capturedImage}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 430px) 100vw, 430px"
-                  className="object-cover"
-                  alt="분석 촬영 이미지"
-                />
-              )}
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`${selectedStyle?.id}-${hasTrackedOverlay ? 'tracked' : 'style'}`}
-                initial={{ opacity: 0, scale: 1.05 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-0 pointer-events-none flex items-center justify-center"
-              >
-                {hasTrackedOverlay && overlay ? (
-                  <svg viewBox={overlay.viewBox} preserveAspectRatio="none" className="h-full w-full">
-                    <g transform="translate(100 0) scale(-1 1)">
-                      {overlay.left && (
-                        <>
-                          {overlay.leftFill && (
-                            <path
-                              d={overlay.leftFill}
-                              fill={BRAND_COLORS.brown}
-                              opacity="0.26"
-                            />
-                          )}
-                          <path
-                            d={overlay.left}
-                            fill="none"
-                            stroke="#C9A96E"
-                            strokeWidth={overlay.strokeWidth ?? 1.6}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            opacity="0.9"
-                            vectorEffect="non-scaling-stroke"
-                          />
-                        </>
-                      )}
-                      {overlay.right && (
-                        <>
-                          {overlay.rightFill && (
-                            <path
-                              d={overlay.rightFill}
-                              fill={BRAND_COLORS.brown}
-                              opacity="0.26"
-                            />
-                          )}
-                          <path
-                            d={overlay.right}
-                            fill="none"
-                            stroke="#C9A96E"
-                            strokeWidth={overlay.strokeWidth ?? 1.6}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            opacity="0.9"
-                            vectorEffect="non-scaling-stroke"
-                          />
-                        </>
-                      )}
-                    </g>
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 400 500" className="w-[85%] h-[85%]">
-                    <g transform="translate(100, 200)">
-                      <path d={selectedStyle?.path} fill="none" stroke={BRAND_COLORS.brown} strokeWidth="6.5" strokeLinecap="round" opacity="0.85" className="scale-[1.3]" />
-                    </g>
-                    <g transform="translate(225, 200)">
-                      <path d={selectedStyle?.path} fill="none" stroke={BRAND_COLORS.brown} strokeWidth="6.5" strokeLinecap="round" opacity="0.85" className="scale-[1.3] translate-x-[75] scale-x-[-1]" />
-                    </g>
-                  </svg>
-                )}
-              </motion.div>
-            </AnimatePresence>
-
+          <div className="relative h-[min(46dvh,410px)] max-h-[410px] max-w-full aspect-[3/4] overflow-hidden rounded-lg border border-glass-border bg-main-brown/5 shadow-2xl">
+            <CameraPreview
+              videoRef={videoRef}
+              canvasRef={canvasRef}
+              cameraPermission={cameraPermission}
+              trackerStatus={trackerStatus}
+              alignment={alignment}
+              detectedFaceShape={detectedFaceShape}
+              liveOverlayAnchors={liveOverlayAnchors}
+              landmarks={latestLandmarks}
+              selectedRecommendation={selectedStyle}
+              ipdGuidance={ipdGuidance}
+              frameGuidance={frameGuidance}
+              errorMessage={errorMessage}
+              PermissionIcon={PermissionIcon}
+              onRequestCameraPermission={requestCameraPermission}
+              onFileUpload={() => undefined}
+              className="h-full rounded-none border-0 bg-main-brown/5 shadow-none"
+              showPermissionFileUpload={false}
+              showFaceGuidance={false}
+              guidanceMode="preview"
+            />
             <div className="absolute left-4 right-4 top-5 flex items-start justify-between gap-3">
               <div className="glass-pill flex items-center gap-2 rounded-full border-glass-border px-3 py-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                <span className="text-main-brown text-[10px] font-black uppercase tracking-[0.1em]">LIVE PREVIEW</span>
+                <span className="text-main-brown text-[10px] font-black uppercase tracking-[0.1em]">LIVE AR</span>
               </div>
               <div
                 className="glass-pill max-w-[52%] rounded-full border-glass-border px-3 py-2 text-right"
@@ -205,6 +201,13 @@ export function ResultPage({
                 </div>
                 <p className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.12em] text-sub-gray/70">
                   {faceShapeStatus.detail}
+                </p>
+              </div>
+            </div>
+            <div className="absolute bottom-4 left-4 right-4">
+              <div className="glass-pill rounded-full border-glass-border px-4 py-2 text-center shadow-sm">
+                <p className="truncate text-[11px] font-bold text-main-brown" aria-live="polite">
+                  {livePreviewMessage}
                 </p>
               </div>
             </div>
