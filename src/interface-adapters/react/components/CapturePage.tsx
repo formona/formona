@@ -140,15 +140,15 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
   const PermissionIcon = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_ICONS[cameraPermission];
 
   return (
-    <div className="app-container relative bg-white px-4 pb-[calc(112px+env(safe-area-inset-bottom))] pt-6">
-      <div className="mb-4 flex items-center justify-between gap-4 pl-[72px] pr-1">
+    <div className="app-container relative bg-white px-3 pb-[calc(92px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))]">
+      <div className="mb-2 flex items-center justify-between gap-3 pl-[52px] pr-1">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-main-brown/45">AR Capture</p>
-          <h2 className="mt-1 truncate text-[20px] font-bold leading-tight text-main-brown">얼굴 정렬 후 촬영</h2>
+          <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-main-brown/45">AR Capture</p>
+          <h2 className="mt-0.5 truncate text-[18px] font-bold leading-tight text-main-brown">얼굴 정렬 후 촬영</h2>
         </div>
         <div
           className={cn(
-            "flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-bold",
+            "flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 text-[10px] font-bold",
             captureReady
               ? "border-green-500/20 bg-green-500/10 text-main-brown"
               : "border-main-brown/10 bg-main-brown/5 text-sub-gray"

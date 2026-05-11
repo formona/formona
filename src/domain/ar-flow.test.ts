@@ -268,6 +268,28 @@ describe('AR flow utilities', () => {
     expect(result?.eyeGeometry.confidence).toBeCloseTo(0.82);
   });
 
+  it('accepts handheld mobile landmarks when the front camera is close and confidence is moderate', () => {
+    const landmarks = withLandmarkConfidence(makeLandmarks({
+      10: landmark(0.5, 0.03),
+      152: landmark(0.5, 0.97),
+    }), 0.58);
+    const validation = validateLandmarkFrame(extractFaceFeatureLandmarks(landmarks));
+    const result = analyzeFaceLandmarks(landmarks, 63, { width: 1280, height: 720 });
+
+    expect(validation).toMatchObject({
+      valid: true,
+      confidence: 0.58,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.alignment).toMatchObject({
+      distanceState: 'too_close',
+      distanceOk: false,
+      yawOk: true,
+      ready: false,
+    });
+    expect(result?.metricConfidence?.reportable).toBe(false);
+  });
+
   it('builds eyebrow overlay anchors from representative landmark positions', () => {
     const anchors = buildEyebrowOverlayAnchorPoints(makeLandmarks());
 
@@ -542,7 +564,7 @@ describe('AR flow utilities', () => {
     }
   });
 
-  it('validates IPD measurement failures for missing landmarks, low confidence, and implausible distances', () => {
+  it('keeps IPD quality issues reportable without blocking analysis when landmarks are present', () => {
     const dimensions = { width: 1080, height: 1920 };
     const alignedFace = buildFaceAlignment(makeLandmarks());
 
@@ -558,15 +580,15 @@ describe('AR flow utilities', () => {
     });
 
     const partialEyeLandmarks = makeLandmarks();
+    delete partialEyeLandmarks[133];
     delete partialEyeLandmarks[159];
     delete partialEyeLandmarks[145];
     const lowConfidenceIpd = extractPupilIpd(partialEyeLandmarks, dimensions);
-    expect(lowConfidenceIpd?.confidence).toBe(0.5);
+    expect(lowConfidenceIpd?.confidence).toBe(0.25);
     expect(validatePupilIpdMeasurement(lowConfidenceIpd, buildFaceAlignment(partialEyeLandmarks), dimensions)).toMatchObject({
-      valid: false,
-      reason: 'low_confidence',
+      valid: true,
+      reason: null,
     });
-    expect(analyzeFaceLandmarks(partialEyeLandmarks, 63, dimensions)).toBeNull();
 
     const implausiblyNarrowIpd = makeLandmarks({
       33: landmark(0.49, 0.43),
@@ -579,16 +601,18 @@ describe('AR flow utilities', () => {
       374: landmark(0.515, 0.45),
     });
     const implausibleIpd = extractPupilIpd(implausiblyNarrowIpd, dimensions);
+    const implausibleAnalysis = analyzeFaceLandmarks(implausiblyNarrowIpd, 63, dimensions);
 
     expect(implausibleIpd?.confidence).toBe(0.85);
     expect(validatePupilIpdMeasurement(implausibleIpd, buildFaceAlignment(implausiblyNarrowIpd), dimensions)).toMatchObject({
       valid: false,
       reason: 'implausible_distance',
     });
-    expect(analyzeFaceLandmarks(implausiblyNarrowIpd, 63, dimensions)).toBeNull();
+    expect(implausibleAnalysis).not.toBeNull();
+    expect(implausibleAnalysis?.metricConfidence.reportable).toBe(false);
   });
 
-  it('validates missing, partial, and low-confidence landmark frames before analysis', () => {
+  it('validates missing and partial landmark frames while allowing low-confidence analysis', () => {
     const dimensions = { width: 1080, height: 1920 };
 
     expect(validateLandmarkFrame(null)).toMatchObject({
@@ -636,36 +660,38 @@ describe('AR flow utilities', () => {
       33: { ...landmark(0.34, 0.43), presence: 0.2 },
     });
     const lowConfidenceValidation = validateLandmarkFrame(extractFaceFeatureLandmarks(lowConfidenceLandmarks));
+    const lowConfidenceAnalysis = analyzeFaceLandmarks(lowConfidenceLandmarks, 63, dimensions);
 
     expect(lowConfidenceValidation).toMatchObject({
-      valid: false,
-      reason: 'low_confidence',
+      valid: true,
+      reason: null,
       confidence: 0.2,
-      canUseFallback: true,
+      canUseFallback: false,
     });
-    expect(buildLandmarkFrameGuidance(lowConfidenceValidation)).toMatchObject({
-      title: 'Landmark 추적이 불안정해요',
-    });
-    expect(analyzeFaceLandmarks(lowConfidenceLandmarks, 63, dimensions)).toBeNull();
+    expect(buildLandmarkFrameGuidance(lowConfidenceValidation)).toBeNull();
+    expect(lowConfidenceAnalysis).not.toBeNull();
+    expect(lowConfidenceAnalysis?.metricConfidence.reportable).toBe(false);
 
     const lowConfidenceEyebrowLandmarks = makeLandmarks({
-      55: { ...landmark(0.42, 0.34), presence: 0.7, visibility: 0.7 },
-      65: { ...landmark(0.36, 0.31), presence: 0.7, visibility: 0.7 },
-      107: { ...landmark(0.27, 0.36), presence: 0.7, visibility: 0.7 },
-      285: { ...landmark(0.58, 0.34), presence: 0.7, visibility: 0.7 },
-      295: { ...landmark(0.64, 0.31), presence: 0.7, visibility: 0.7 },
-      336: { ...landmark(0.73, 0.36), presence: 0.7, visibility: 0.7 },
+      55: { ...landmark(0.42, 0.34), presence: 0.5, visibility: 0.5 },
+      65: { ...landmark(0.36, 0.31), presence: 0.5, visibility: 0.5 },
+      107: { ...landmark(0.27, 0.36), presence: 0.5, visibility: 0.5 },
+      285: { ...landmark(0.58, 0.34), presence: 0.5, visibility: 0.5 },
+      295: { ...landmark(0.64, 0.31), presence: 0.5, visibility: 0.5 },
+      336: { ...landmark(0.73, 0.36), presence: 0.5, visibility: 0.5 },
     });
     const lowConfidenceEyebrowValidation = validateLandmarkFrame(extractFaceFeatureLandmarks(lowConfidenceEyebrowLandmarks));
+    const lowConfidenceEyebrowAnalysis = analyzeFaceLandmarks(lowConfidenceEyebrowLandmarks, 63, dimensions);
 
     expect(lowConfidenceEyebrowValidation).toMatchObject({
-      valid: false,
-      reason: 'low_confidence',
-      confidence: 0.7,
+      valid: true,
+      reason: null,
+      confidence: 0.5,
       missingRequiredIndices: [],
-      canUseFallback: true,
+      canUseFallback: false,
     });
-    expect(analyzeFaceLandmarks(lowConfidenceEyebrowLandmarks, 63, dimensions)).toBeNull();
+    expect(lowConfidenceEyebrowAnalysis).not.toBeNull();
+    expect(lowConfidenceEyebrowAnalysis?.metricConfidence.reportable).toBe(false);
 
     expect(validateLandmarkFrame(extractFaceFeatureLandmarks(makeLandmarks()))).toMatchObject({
       valid: true,
@@ -675,7 +701,7 @@ describe('AR flow utilities', () => {
     });
   });
 
-  it('does not return measurements when landmark alignment confidence is too low', () => {
+  it('returns low-reportability measurements when landmark alignment is not ready', () => {
     const tiltedFace = makeLandmarks({
       33: landmark(0.34, 0.49),
       263: landmark(0.66, 0.39),
@@ -685,7 +711,11 @@ describe('AR flow utilities', () => {
       confidence: 0.75,
       ready: false,
     });
-    expect(analyzeFaceLandmarks(tiltedFace, 63, { width: 1080, height: 1920 })).toBeNull();
+    const analysis = analyzeFaceLandmarks(tiltedFace, 63, { width: 1080, height: 1920 });
+
+    expect(analysis).not.toBeNull();
+    expect(analysis?.metricConfidence.reportable).toBe(false);
+    expect(analysis?.metricConfidence.metrics.sp.reasons).toContain('alignment_unstable');
   });
 
   it('returns directional real-time alignment guidance from FaceMesh landmarks', () => {
@@ -700,7 +730,7 @@ describe('AR flow utilities', () => {
     });
 
     expect(buildFaceAlignment(makeLandmarks({
-      10: landmark(0.5, 0.32),
+      10: landmark(0.5, 0.38),
       152: landmark(0.5, 0.62),
     }))).toMatchObject({
       distanceState: 'too_far',

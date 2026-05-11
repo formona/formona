@@ -37,9 +37,8 @@ export const FRONT_CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
   video: {
     facingMode: { ideal: 'user' },
-    width: { ideal: 1080 },
-    height: { ideal: 1920 },
-    aspectRatio: { ideal: 0.5625 },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
   },
 };
 
@@ -48,15 +47,13 @@ export const FRONT_CAMERA_FALLBACK_CONSTRAINTS: MediaStreamConstraints[] = [
   {
     audio: false,
     video: {
-      facingMode: { exact: 'user' },
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
+      facingMode: { ideal: 'user' },
     },
   },
   {
     audio: false,
     video: {
-      facingMode: 'user',
+      facingMode: { exact: 'user' },
     },
   },
 ];

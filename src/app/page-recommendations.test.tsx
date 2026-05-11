@@ -256,6 +256,34 @@ describe('HomePage recommendation routing', () => {
     expect(screen.queryByText('자연 아치형')).not.toBeInTheDocument();
   });
 
+  it('continues to recommendations when captured geometry confidence is zero but measurements are valid', async () => {
+    const analysis = makeAnalysis(FaceShape.HEART);
+    analysisMock.current = {
+      ...analysis,
+      eyebrowPosition: {
+        ...analysis.eyebrowPosition,
+        confidence: 0,
+      },
+      eyeGeometry: {
+        ...analysis.eyeGeometry,
+        confidence: 0,
+      },
+    };
+
+    render(<HomePage />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(APP_TIMING_MS.splash);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mock capture complete' }));
+
+    expect(screen.queryByText('Recommendation Error')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '기준점 신뢰도가 낮아요' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('직선 수평형').length).toBeGreaterThan(0);
+  });
+
   it('shows an explicit recommendation error instead of fallback styles when metrics are invalid', async () => {
     analysisMock.current = {
       ...makeAnalysis(FaceShape.HEART),

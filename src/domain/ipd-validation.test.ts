@@ -58,24 +58,22 @@ describe('IPD measurement validation', () => {
     });
   });
 
-  it('classifies partial eye landmarks as low confidence before using them for mm scale', () => {
+  it('allows partial eye landmarks and leaves low confidence to metric reporting', () => {
     const landmarks = makeLandmarks();
+    delete landmarks[133];
     delete landmarks[159];
     delete landmarks[145];
 
     const pupilIpd = extractPupilIpd(landmarks, dimensions);
     const validation = validatePupilIpdMeasurement(pupilIpd, buildFaceAlignment(landmarks), dimensions);
 
-    expect(pupilIpd?.confidence).toBe(0.5);
+    expect(pupilIpd?.confidence).toBe(0.25);
     expect(validation).toEqual({
-      valid: false,
-      reason: 'low_confidence',
-      confidence: 0.5,
+      valid: true,
+      reason: null,
+      confidence: 0.25,
     });
-    expect(buildIpdMeasurementGuidance(validation)).toMatchObject({
-      reason: 'low_confidence',
-      title: '동공 기준점이 불안정해요',
-    });
+    expect(buildIpdMeasurementGuidance(validation)).toBeNull();
   });
 
   it('classifies implausibly narrow detected pupil distances as invalid', () => {

@@ -289,9 +289,8 @@ export const CameraPreview = ({
       <div
         ref={previewFrameRef}
         className={cn(
-          "relative w-full flex-1 min-h-0 overflow-hidden rounded-[34px] border border-main-brown/10 bg-main-brown/5 shadow-2xl",
-          "max-h-[calc(100dvh-178px)]",
-          cameraPermission === 'granted' ? "aspect-[9/14]" : "aspect-[9/13]",
+          "relative w-full flex-1 min-h-0 overflow-hidden rounded-[26px] border border-main-brown/10 bg-main-brown/5 shadow-2xl",
+          cameraPermission === 'granted' ? "h-full" : "aspect-[9/13]",
           className
         )}
       >
@@ -355,7 +354,7 @@ export const CameraPreview = ({
               autoPlay
               muted
               playsInline
-              className="w-full h-full object-cover scale-x-[-1]"
+              className="h-full w-full scale-x-[-1] object-cover"
             />
             <canvas
               ref={arOverlayCanvasRef}

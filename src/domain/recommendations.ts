@@ -106,6 +106,10 @@ const isPositiveFiniteNumber = (value: unknown) => (
   typeof value === 'number' && Number.isFinite(value) && value > 0
 );
 
+const isFiniteNumber = (value: unknown) => (
+  typeof value === 'number' && Number.isFinite(value)
+);
+
 const scoreStyleForContext = (
   style: EyebrowStyle,
   context: EyebrowRecommendationContext,
@@ -187,13 +191,13 @@ export const validateEyebrowRecommendationContext = (
     return validationResult('missing_scale');
   }
 
+  if (!context.eyebrowPosition || !context.eyeGeometry) return validationResult('missing_geometry');
+
   if (
-    !context.eyebrowPosition
-    || !context.eyeGeometry
-    || !isPositiveFiniteNumber(context.eyebrowPosition.confidence)
-    || !isPositiveFiniteNumber(context.eyeGeometry.confidence)
+    !isFiniteNumber(context.eyebrowPosition.confidence)
+    || !isFiniteNumber(context.eyeGeometry.confidence)
   ) {
-    return validationResult('low_confidence');
+    return validationResult('missing_geometry');
   }
 
   return validationResult(null);

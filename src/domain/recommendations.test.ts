@@ -418,14 +418,20 @@ describe('eyebrow recommendations', () => {
     expect(validateEyebrowRecommendationContext({
       ...readyContext,
       eyebrowPosition: null,
-    }).reason).toBe('low_confidence');
-    expect(validateEyebrowRecommendationContext({
+    }).reason).toBe('missing_geometry');
+    const zeroConfidenceContext = {
       ...readyContext,
+      eyebrowPosition: {
+        ...readyContext.eyebrowPosition,
+        confidence: 0,
+      },
       eyeGeometry: {
         ...readyContext.eyeGeometry,
         confidence: 0,
       },
-    }).reason).toBe('low_confidence');
+    };
+    expect(validateEyebrowRecommendationContext(zeroConfidenceContext).reason).toBeNull();
+    expect(buildEyebrowRecommendationStateFromContext(zeroConfidenceContext).status).toBe('ready');
   });
 
   it('returns an explicit error state instead of recommendations when calculated metrics are invalid', () => {

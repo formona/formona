@@ -100,7 +100,7 @@ describe('eyebrow metric landmark fixtures', () => {
     expect(asymmetric?.metrics.archHeight).toBeGreaterThan(balanced?.metrics.archHeight ?? 0);
   });
 
-  it('rejects out-of-frame and low-confidence metric landmarks before returning mm output', () => {
+  it('rejects out-of-frame landmarks and marks low-confidence metric landmarks ineligible', () => {
     const outOfFrame = makeOutOfFrameEyebrowMetricLandmarks();
     const lowConfidence = makeLowConfidenceEyebrowMetricLandmarks();
     const pupilIpd = extractPupilIpd(
@@ -120,8 +120,8 @@ describe('eyebrow metric landmark fixtures', () => {
     )).toBeNull();
 
     expect(validateLandmarkFrame(extractFaceFeatureLandmarks(lowConfidence))).toMatchObject({
-      valid: false,
-      reason: 'low_confidence',
+      valid: true,
+      reason: null,
       confidence: 0.45,
     });
     expect(pupilIpd).not.toBeNull();
@@ -130,18 +130,20 @@ describe('eyebrow metric landmark fixtures', () => {
       pupilIpd!,
       EYEBROW_METRIC_FIXTURES[0].expected.pxToMmScale,
       EYEBROW_METRIC_FIXTURES[0].dimensions,
-    )).toBe(false);
+    )).toBe(true);
     expect(extractEyebrowPositionMetrics(
       lowConfidence,
       pupilIpd!,
       EYEBROW_METRIC_FIXTURES[0].expected.pxToMmScale,
       EYEBROW_METRIC_FIXTURES[0].dimensions,
-    )).toBeNull();
-    expect(analyzeFaceLandmarks(
+    )).not.toBeNull();
+    const lowConfidenceAnalysis = analyzeFaceLandmarks(
       lowConfidence,
       EYEBROW_METRIC_FIXTURES[0].ipdMm,
       EYEBROW_METRIC_FIXTURES[0].dimensions,
-    )).toBeNull();
+    );
+    expect(lowConfidenceAnalysis).not.toBeNull();
+    expect(lowConfidenceAnalysis?.metricConfidence.reportable).toBe(false);
   });
 
   it('marks eyebrow metric reporting ineligible when expected error exceeds the 5mm threshold', () => {
