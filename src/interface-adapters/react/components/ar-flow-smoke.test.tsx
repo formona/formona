@@ -362,8 +362,17 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     }
   });
 
+  it('requests the camera automatically when remounted for retry capture', () => {
+    render(<CapturePage ipdMm={63} autoStartCamera onAnalysisComplete={vi.fn()} />);
+
+    expect(trackerMock.requestCameraPermission).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: '카메라 허용' })).toBeInTheDocument();
+  });
+
   it('transitions CapturePage from loading to camera-ready to face-detected and analysis-loading', async () => {
     vi.useFakeTimers();
+    vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1080);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1920);
     const { onAnalysisComplete, rerender } = renderCapturePage();
 
     trackerMock.state = {
@@ -400,13 +409,15 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    const captureButton = screen.getByRole('button', { name: '촬영하고 추천 보기' });
-    expect(screen.getByText('촬영 가능')).toBeInTheDocument();
+    const captureButton = screen.getByRole('button', { name: '자동 분석 중' });
+    expect(screen.getByText('자동 분석')).toBeInTheDocument();
     expect(screen.getByText('계란형 감지')).toBeInTheDocument();
     expect(screen.getByText('정면 위치가 안정적입니다')).toBeInTheDocument();
-    expect(captureButton).toBeEnabled();
+    expect(captureButton).toBeDisabled();
 
-    fireEvent.click(captureButton);
+    act(() => {
+      vi.advanceTimersByTime(650);
+    });
 
     expect(trackerMock.stopCameraStream).toHaveBeenCalledOnce();
     expect(screen.getByText('AI 스타일 정밀 분석')).toBeInTheDocument();
@@ -548,7 +559,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(canvasContextMock.stroke).not.toHaveBeenCalled();
   });
 
-  it('allows capture once measurements are ready even if the current face is slightly off-center', () => {
+  it('starts automatic analysis once measurements are ready even if the current face is slightly off-center', () => {
     const { onAnalysisComplete, rerender } = renderCapturePage();
 
     trackerMock.state = {
@@ -561,11 +572,11 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
     expect(screen.getByText('얼굴을 오른쪽으로 조금 이동해주세요')).toBeInTheDocument();
-    expect(screen.getByText('촬영 가능')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '촬영하고 추천 보기' })).toBeEnabled();
+    expect(screen.getByText('자동 분석')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
   });
 
-  it('allows capture when analysis exists even if metric reportability is low', () => {
+  it('starts automatic analysis when analysis exists even if metric reportability is low', () => {
     const { onAnalysisComplete, rerender } = renderCapturePage();
     const lowReportabilityAnalysis = {
       ...makeAnalysis(),
@@ -585,8 +596,8 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    expect(screen.getByText('촬영 가능')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '촬영하고 추천 보기' })).toBeEnabled();
+    expect(screen.getByText('자동 분석')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
   });
 
   it('surfaces AR fallback guidance when no face is visible', () => {
@@ -714,7 +725,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
       />,
     );
 
-    expect(screen.getByText('Analysis Complete')).toBeInTheDocument();
+    expect(screen.getByText('분석 완료')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: FACE_SHAPE_RESULT_COPY[FaceShape.ROUND].title })).toBeInTheDocument();
     expect(screen.getByText('눈썹 길이')).toBeInTheDocument();
     expect(screen.getByText('50.2mm')).toBeInTheDocument();

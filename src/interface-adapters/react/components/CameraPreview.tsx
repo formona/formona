@@ -39,9 +39,7 @@ interface CameraPreviewProps {
   errorMessage: string | null;
   PermissionIcon: React.ComponentType<{ size?: number; className?: string }> | null;
   onRequestCameraPermission: () => void;
-  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   className?: string;
-  showPermissionFileUpload?: boolean;
   showFaceGuidance?: boolean;
   guidanceMode?: 'capture' | 'preview';
 }
@@ -70,9 +68,7 @@ export const CameraPreview = ({
   errorMessage,
   PermissionIcon,
   onRequestCameraPermission,
-  onFileUpload,
   className,
-  showPermissionFileUpload = true,
   showFaceGuidance = true,
   guidanceMode = 'capture',
 }: CameraPreviewProps) => {
@@ -295,7 +291,7 @@ export const CameraPreview = ({
       <div
         ref={previewFrameRef}
         className={cn(
-          "relative w-full flex-1 min-h-0 overflow-hidden rounded-[26px] border border-main-brown/10 bg-main-brown/5 shadow-2xl",
+          "relative w-full flex-1 min-h-0 overflow-hidden rounded-3xl border border-main-brown/10 bg-main-brown/5",
           cameraPermission === 'granted' ? "h-full" : "aspect-[9/13]",
           className
         )}
@@ -328,12 +324,12 @@ export const CameraPreview = ({
               )}
             </div>
             {cameraPermission === 'idle' && (
-              <p className="mt-5 max-w-[260px] text-[12px] font-medium leading-relaxed text-sub-gray">
+              <p className="mt-5 max-w-[260px] text-[12px] font-light leading-relaxed text-sub-gray">
                 화면 중앙에 얼굴을 맞추면 실시간 가이드가 표시됩니다.
               </p>
             )}
             {permissionCopy?.guidance && (
-              <div className="mt-5 w-full max-w-[310px] space-y-3 rounded-3xl bg-white/80 p-4 text-left shadow-sm">
+              <div className="mt-5 w-full max-w-[310px] space-y-3 rounded-2xl border border-main-brown/10 bg-white p-4 text-left">
                 {permissionCopy.guidance.map((guide) => (
                   <div key={guide.title} className="space-y-2">
                     <p className="text-[12px] font-bold text-main-brown">{guide.title}</p>
@@ -350,8 +346,6 @@ export const CameraPreview = ({
               mode="permission"
               cameraPermission={cameraPermission}
               onRequestCameraPermission={onRequestCameraPermission}
-              onFileUpload={onFileUpload}
-              allowFileUpload={showPermissionFileUpload}
             />
           </div>
         ) : (

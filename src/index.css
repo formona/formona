@@ -26,24 +26,20 @@
   }
 }
 
-/* MONABROW Glassmorphism */
+/* MONABROW MVP surfaces */
 .glass {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #ffffff;
   border: 1px solid rgba(79, 44, 29, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 .glass-bright {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border: 1px solid rgba(79, 44, 29, 0.08);
 }
 
 .glass-pill {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(8px);
+  background: #ffffff;
   border: 1px solid rgba(79, 44, 29, 0.06);
 }
 
@@ -57,7 +53,7 @@
   border: 1px solid transparent;
   padding: 0 22px;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
   text-align: center;
@@ -93,14 +89,14 @@
   background: #4F2C1D;
   color: #ffffff;
   border-color: #4F2C1D;
-  box-shadow: 0 14px 28px rgba(79, 44, 29, 0.22);
+  box-shadow: none;
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.86);
+  background: #ffffff;
   color: #4F2C1D;
-  border-color: rgba(79, 44, 29, 0.12);
-  box-shadow: 0 8px 18px rgba(79, 44, 29, 0.08);
+  border-color: #4F2C1D;
+  box-shadow: none;
 }
 
 .btn-subtle {
@@ -137,23 +133,19 @@
   .btn-primary:hover:not(:disabled) {
     background: #3f2317;
     border-color: #3f2317;
-    box-shadow: 0 16px 32px rgba(79, 44, 29, 0.26);
+    box-shadow: none;
   }
 
   .btn-secondary:hover:not(:disabled),
   .btn-subtle:hover:not(:disabled) {
     border-color: rgba(79, 44, 29, 0.22);
-    box-shadow: 0 10px 22px rgba(79, 44, 29, 0.11);
+    box-shadow: none;
   }
 }
 
 /* Subtle Brand Backdrop / Accent */
 .brand-accent {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 50% -20%, rgba(79, 44, 29, 0.08) 0%, transparent 60%);
-  z-index: -1;
-  pointer-events: none;
+  display: none;
 }
 
 @keyframes float {
@@ -194,8 +186,8 @@
 }
 
 .ipd-card {
-  padding: 48px;
-  border-radius: 52px;
+  padding: 40px 32px;
+  border-radius: 24px;
 }
 
 .ipd-header {
@@ -215,7 +207,7 @@
 
   .ipd-card {
     padding: 32px 28px;
-    border-radius: 40px;
+    border-radius: 24px;
   }
 
   .ipd-header {
@@ -246,7 +238,7 @@
 
   .ipd-card {
     padding: 24px;
-    border-radius: 32px;
+    border-radius: 24px;
   }
 
   .ipd-header {

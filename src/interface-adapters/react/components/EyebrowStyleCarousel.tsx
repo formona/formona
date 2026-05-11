@@ -110,9 +110,8 @@ export function EyebrowStyleCarousel({
               onClick={() => onSelectStyle(style)}
               className={cn(
                 "shrink-0 snap-center rounded-2xl border bg-white p-5 text-left transition-all duration-300",
-                "shadow-[0_10px_28px_rgba(79,44,29,0.08)]",
                 selected
-                  ? "border-main-brown opacity-100 shadow-[0_14px_34px_rgba(79,44,29,0.14)]"
+                  ? "border-main-brown opacity-100"
                   : "border-main-brown/10 opacity-55"
               )}
               style={{ width: 'min(280px, 76vw)' }}

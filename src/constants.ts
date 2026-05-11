@@ -16,7 +16,7 @@ export enum Page {
 export const BRAND_COLORS = {
   brown: '#4F2C1D',
   gray: '#727171',
-  faceGuideDetected: '#4ADE80',
+  faceGuideDetected: '#2E7D32',
   faceGuideIdle: 'rgba(255,255,255,0.4)',
 } as const;
 

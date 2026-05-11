@@ -22,7 +22,7 @@ export function FaceShapeImage({ faceShape, className }: FaceShapeImageProps) {
   return (
     <div
       className={cn(
-        "w-[86px] rounded-2xl border border-main-brown/10 bg-white p-2 text-center shadow-[0_8px_22px_rgba(79,44,29,0.08)]",
+        "w-[86px] rounded-2xl border border-main-brown/10 bg-white p-2 text-center",
         className
       )}
       role="img"

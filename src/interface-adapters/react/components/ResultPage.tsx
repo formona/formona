@@ -58,7 +58,7 @@ const getFaceShapeStatus = (faceShape: FaceShape | null, analysis: FaceAnalysisR
   return {
     label: faceShape,
     detail: 'Detected face shape',
-    dotClassName: 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]',
+    dotClassName: 'bg-main-brown',
   };
 };
 
@@ -164,7 +164,7 @@ export function ResultPage({
     >
       <div className="absolute left-0 right-0 top-0 z-0 flex h-[min(62dvh,560px)] flex-col items-center overflow-hidden">
         <div className="mt-20 mb-4 flex w-full justify-center px-6">
-          <div className="relative h-[min(46dvh,410px)] max-h-[410px] max-w-full aspect-[3/4] overflow-hidden rounded-lg border border-glass-border bg-main-brown/5 shadow-2xl">
+          <div className="relative h-[min(46dvh,410px)] max-h-[410px] max-w-full aspect-[3/4] overflow-hidden rounded-lg border border-glass-border bg-main-brown/5">
             <CameraPreview
               videoRef={videoRef}
               canvasRef={canvasRef}
@@ -180,32 +180,30 @@ export function ResultPage({
               errorMessage={errorMessage}
               PermissionIcon={PermissionIcon}
               onRequestCameraPermission={requestCameraPermission}
-              onFileUpload={() => undefined}
               className="h-full rounded-none border-0 bg-main-brown/5 shadow-none"
-              showPermissionFileUpload={false}
               showFaceGuidance={false}
               guidanceMode="preview"
             />
             <div className="absolute left-4 right-4 top-5 flex items-start justify-between gap-3">
-              <div className="glass-pill flex items-center gap-2 rounded-full border-glass-border px-3 py-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                <span className="text-main-brown text-[10px] font-black uppercase tracking-[0.1em]">LIVE AR</span>
+              <div className="glass-pill flex items-center gap-2 rounded-2xl border-glass-border px-3 py-2">
+                <div className="w-2 h-2 bg-main-brown rounded-full animate-pulse" />
+                <span className="text-main-brown text-[10px] font-bold">LIVE AR</span>
               </div>
               <div
-                className="glass-pill max-w-[52%] rounded-full border-glass-border px-3 py-2 text-right"
+                className="glass-pill max-w-[52%] rounded-2xl border-glass-border px-3 py-2 text-right"
                 aria-live="polite"
               >
                 <div className="flex items-center justify-end gap-2">
                   <span className={cn("h-2 w-2 shrink-0 rounded-full", faceShapeStatus.dotClassName)} />
                   <span className="truncate text-[12px] font-bold text-main-brown">{faceShapeStatus.label}</span>
                 </div>
-                <p className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.12em] text-sub-gray/70">
+                <p className="mt-0.5 truncate text-[9px] font-bold text-sub-gray/70">
                   {faceShapeStatus.detail}
                 </p>
               </div>
             </div>
             <div className="absolute bottom-4 left-4 right-4">
-              <div className="glass-pill rounded-full border-glass-border px-4 py-2 text-center shadow-sm">
+              <div className="glass-pill rounded-2xl border-glass-border px-4 py-2 text-center">
                 <p className="truncate text-[11px] font-bold text-main-brown" aria-live="polite">
                   {livePreviewMessage}
                 </p>
@@ -215,18 +213,18 @@ export function ResultPage({
         </div>
 
         <div className="mb-5 px-10 text-center space-y-2">
-          <h3 className="text-xl font-bold text-main-brown tracking-normal uppercase">{selectedStyle?.name}</h3>
-          <p className="text-sub-gray text-[14px] font-medium leading-tight">당신에게 가장 잘 어울리는 스타일이에요.</p>
+          <h3 className="text-xl font-bold text-main-brown">{selectedStyle?.name}</h3>
+          <p className="text-sub-gray text-[14px] font-light leading-tight">당신에게 가장 잘 어울리는 스타일이에요.</p>
         </div>
       </div>
 
       <div className="absolute inset-0 z-10 overflow-y-auto no-scrollbar pt-[min(62dvh,560px)]">
-        <div className="shadow-[0_-12px_40px_rgba(0,0,0,0.10)] rounded-t-lg p-6 pb-[190px] min-h-screen bg-white/95 backdrop-blur-3xl border-t border-glass-border space-y-10">
+        <div className="rounded-t-lg p-6 pb-[190px] min-h-screen bg-white border-t border-glass-border space-y-10">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 px-2">
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-4 bg-main-brown rounded-full" />
-                <h4 className="text-[14px] font-bold text-main-brown tracking-widest uppercase opacity-40">추천 스타일 변경</h4>
+                <h4 className="text-[14px] font-bold text-main-brown opacity-60">추천 스타일 변경</h4>
               </div>
               {selectedStyle && (
                 <span className="shrink-0 text-[12px] font-bold text-main-brown">{selectedStyle.name}</span>
@@ -250,7 +248,7 @@ export function ResultPage({
           <div className="space-y-6">
             <div className="flex items-center gap-3 px-2">
               <div className="w-1.5 h-4 bg-main-brown rounded-full" />
-              <h4 className="text-[14px] font-bold text-main-brown tracking-widest uppercase opacity-40">측정 수치</h4>
+              <h4 className="text-[14px] font-bold text-main-brown opacity-60">측정 수치</h4>
             </div>
 
             {measurementGateMessage && (

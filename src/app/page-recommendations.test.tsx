@@ -14,6 +14,9 @@ import {
 const analysisMock = vi.hoisted(() => ({
   current: null as FaceAnalysisResult | null,
 }));
+const capturePageMock = vi.hoisted(() => ({
+  props: [] as Array<{ autoStartCamera?: boolean }>,
+}));
 
 vi.mock('motion/react', async () => {
   const ReactModule = await import('react');
@@ -46,20 +49,29 @@ vi.mock('motion/react', async () => {
 
 vi.mock('../interface-adapters/react/components/CapturePage', () => ({
   CapturePage: ({
+    autoStartCamera,
     onAnalysisComplete,
   }: {
+    autoStartCamera?: boolean;
     onAnalysisComplete: (imageDataUrl: string, analysis: FaceAnalysisResult) => void;
-  }) => (
-    <button
-      type="button"
-      onClick={() => {
-        if (!analysisMock.current) throw new Error('Missing mocked analysis');
-        onAnalysisComplete('data:image/jpeg;base64,monabrow', analysisMock.current);
-      }}
-    >
-      Mock capture complete
-    </button>
-  ),
+  }) => {
+    capturePageMock.props.push({ autoStartCamera });
+
+    return (
+      <>
+        {autoStartCamera && <span>Mock camera auto-start</span>}
+        <button
+          type="button"
+          onClick={() => {
+            if (!analysisMock.current) throw new Error('Missing mocked analysis');
+            onAnalysisComplete('data:image/jpeg;base64,monabrow', analysisMock.current);
+          }}
+        >
+          Mock capture complete
+        </button>
+      </>
+    );
+  },
 }));
 
 const readyAlignment: FaceAlignment = {
@@ -234,6 +246,7 @@ describe('HomePage recommendation routing', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     analysisMock.current = makeAnalysis(FaceShape.HEART);
+    capturePageMock.props = [];
   });
 
   afterEach(() => {
@@ -307,5 +320,22 @@ describe('HomePage recommendation routing', () => {
     expect(screen.getByText(/임의 추천을 표시하지 않았습니다/)).toBeInTheDocument();
     expect(screen.queryByText('직선 수평형')).not.toBeInTheDocument();
     expect(screen.queryByText('자연 아치형')).not.toBeInTheDocument();
+  });
+
+  it('auto-starts the camera when returning to capture from recommendation retry', async () => {
+    render(<HomePage />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(APP_TIMING_MS.splash);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
+    expect(capturePageMock.props.at(-1)).toEqual({ autoStartCamera: false });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mock capture complete' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 스캔' }));
+
+    expect(screen.getByText('Mock camera auto-start')).toBeInTheDocument();
+    expect(capturePageMock.props.at(-1)).toEqual({ autoStartCamera: true });
   });
 });

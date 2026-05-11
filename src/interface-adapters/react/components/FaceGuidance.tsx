@@ -87,7 +87,7 @@ export const FaceGuidance = ({
   const guideColor = aligned
     ? BRAND_COLORS.faceGuideDetected
     : faceDetected
-      ? '#F59E0B'
+      ? BRAND_COLORS.brown
       : BRAND_COLORS.faceGuideIdle;
 
   return (
@@ -113,8 +113,8 @@ export const FaceGuidance = ({
       </div>
 
       <div className="absolute left-3 right-3 top-3 flex justify-center">
-        <div className="glass-pill max-w-full rounded-full border-glass-border px-3.5 py-2 shadow-sm">
-          <p aria-live="polite" className="truncate text-[12px] font-bold tracking-tight text-main-brown">
+        <div className="glass-pill max-w-full rounded-2xl border-glass-border px-3.5 py-2">
+          <p aria-live="polite" className="truncate text-[12px] font-bold text-main-brown">
             {guidanceMessage}
           </p>
         </div>
@@ -126,8 +126,8 @@ export const FaceGuidance = ({
             role="status"
             aria-live="polite"
             className={cn(
-              "rounded-[18px] border bg-white/[0.94] px-3 py-2.5 text-main-brown shadow-sm backdrop-blur-md",
-              fallbackState.kind === 'no-face' ? "border-main-brown/20" : "border-amber-400/35"
+              "rounded-2xl border bg-white px-3 py-2.5 text-main-brown",
+              fallbackState.kind === 'no-face' ? "border-main-brown/20" : "border-main-brown/35"
             )}
           >
             <p className="flex min-w-0 items-center gap-2 text-[11px] font-bold">
@@ -135,7 +135,7 @@ export const FaceGuidance = ({
                 size={14}
                 className={cn(
                   "shrink-0",
-                  fallbackState.kind === 'no-face' ? "text-main-brown/55" : "text-amber-500"
+                  "text-main-brown/55"
                 )}
               />
               <span className="shrink-0 rounded-full bg-main-brown/8 px-2 py-0.5 text-[9px] font-bold text-main-brown">
@@ -143,7 +143,7 @@ export const FaceGuidance = ({
               </span>
               <span className="min-w-0 truncate">{fallbackState.title}</span>
             </p>
-            <p className="mt-1 text-[10px] font-medium leading-snug text-sub-gray">
+            <p className="mt-1 text-[10px] font-light leading-snug text-sub-gray">
               {fallbackState.message}
             </p>
             <p className="mt-1 text-[10px] font-bold leading-relaxed text-main-brown">
@@ -151,7 +151,7 @@ export const FaceGuidance = ({
             </p>
           </div>
         )}
-        <div className="flex items-center justify-between gap-2 rounded-[18px] border border-main-brown/10 bg-white/[0.82] px-3 py-2.5 shadow-sm backdrop-blur-md">
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-main-brown/10 bg-white px-3 py-2.5">
           <p className="flex min-w-[112px] flex-1 items-center gap-2 text-[11px] font-bold text-main-brown">
             {aligned ? <CheckCircle2 size={14} className="shrink-0" /> : faceDetected ? <MoveHorizontal size={14} className="shrink-0" /> : <ScanFace size={14} className="shrink-0" />}
             <span className="truncate">{statusLabel}</span>
@@ -167,14 +167,14 @@ export const FaceGuidance = ({
           {faceDetected && (
             <div className="h-1.5 min-w-[76px] overflow-hidden rounded-full bg-main-brown/10" aria-label={`정렬 정확도 ${Math.round(alignment.confidence * 100)}%`}>
               <div
-                className={cn("h-full rounded-full", aligned ? "bg-green-500" : "bg-amber-500")}
+                className={cn("h-full rounded-full", aligned ? "bg-main-brown" : "bg-main-brown/50")}
                 style={{ width: `${Math.round(alignment.confidence * 100)}%` }}
               />
             </div>
           )}
           <span className={cn(
             "h-2.5 w-2.5 shrink-0 rounded-full",
-            aligned ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.55)]" : faceDetected ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.45)]" : "bg-main-brown/25"
+            aligned ? "bg-main-brown" : faceDetected ? "bg-main-brown/50" : "bg-main-brown/25"
           )} />
         </div>
       </div>

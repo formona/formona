@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, ChevronLeft, Info, Loader2, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, Eye, Info, Loader2, RefreshCw, TriangleAlert } from 'lucide-react';
 import {
   APP_TIMING_MS,
   BRAND_COLORS,
@@ -67,6 +67,7 @@ export default function HomePage() {
   const [selectedStyle, setSelectedStyle] = useState<EyebrowStyle | null>(null);
   const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysisResult | null>(null);
   const [recommendationContext, setRecommendationContext] = useState<EyebrowRecommendationContext | null>(null);
+  const [autoStartCapture, setAutoStartCapture] = useState(false);
   const currentIpdInput = parseValidIpd(ipdInput);
   const ipdInputError = ipdInput.length > 0 && currentIpdInput === null;
   const canGoBack = currentPage === Page.CAPTURE || currentPage === Page.RECOMMENDATIONS || currentPage === Page.RESULT;
@@ -78,6 +79,7 @@ export default function HomePage() {
     setFaceAnalysis(analysis);
     setRecommendationContext(nextRecommendationState.context);
     setSelectedStyle(nextRecommendationState.status === 'ready' ? nextRecommendationState.recommendations[0] : null);
+    setAutoStartCapture(false);
     setCurrentPage(Page.RECOMMENDATIONS);
   };
 
@@ -98,9 +100,11 @@ export default function HomePage() {
       case Page.IPD_INPUT:
         break;
       case Page.CAPTURE:
+        setAutoStartCapture(false);
         setCurrentPage(Page.IPD_INPUT);
         break;
       case Page.RECOMMENDATIONS:
+        setAutoStartCapture(true);
         setCurrentPage(Page.CAPTURE);
         break;
       case Page.RESULT:
@@ -116,6 +120,7 @@ export default function HomePage() {
     setFaceAnalysis(null);
     setRecommendationContext(null);
     setSelectedStyle(null);
+    setAutoStartCapture(true);
     setCurrentPage(Page.CAPTURE);
   };
 
@@ -136,59 +141,20 @@ export default function HomePage() {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="flex flex-col items-center gap-8"
       >
-        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/20 bg-white shadow-2xl">
+        <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-white/20 bg-white">
           <svg width="48" height="48" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <path d="M10 5H30V10H15V18H28V23H15V35H10V5Z" fill={BRAND_COLORS.brown} />
           </svg>
         </div>
 
         <div className="space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.34em] text-white/65">FORMONA</p>
+          <p className="text-[11px] font-bold text-white/65">FORMONA</p>
           <h1 className="text-[42px] font-bold leading-none tracking-normal">MONABROW</h1>
-          <p className="text-[15px] font-medium leading-relaxed text-white/75">
+          <p className="text-[15px] font-light leading-relaxed text-white/75">
             첫 인상을 디자인하다,<br />눈썹 화장의 원픽
           </p>
         </div>
       </motion.div>
-    </motion.div>
-  );
-
-  // Page 1: Intro
-  const IntroPage = () => (
-    <motion.div
-      key="intro"
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      className="app-container p-8 text-center justify-center"
-    >
-      <div className="glass p-12 rounded-[56px] w-full space-y-12 relative overflow-hidden">
-        <div className="space-y-8 relative z-10">
-          <div className="w-20 h-20 bg-white/90 backdrop-blur-xl rounded-[28px] flex items-center justify-center mx-auto animate-float shadow-xl border border-white/60">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <path d="M10 5H30V10H15V18H28V23H15V35H10V5Z" fill={BRAND_COLORS.brown}/>
-            </svg>
-          </div>
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold tracking-tighter text-main-brown uppercase">MONABROW</h1>
-            <div className="space-y-2">
-              <p className="text-main-brown font-bold text-[18px] leading-snug">첫 인상을 디자인하다,<br />눈썹 화장의 원픽</p>
-              <p className="text-sub-gray font-light text-[14px] opacity-80">당신만의 눈썹을 찾는 가장 정교한 방법</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          <button
-            onClick={() => setCurrentPage(Page.IPD_INPUT)}
-            className="btn btn-primary btn-full group/btn"
-          >
-            시작하기
-            <ChevronRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-          </button>
-          <p className="text-[10px] text-sub-gray font-light opacity-50 uppercase tracking-widest">© FORMONA CO., LTD.</p>
-        </div>
-      </div>
     </motion.div>
   );
 
@@ -203,10 +169,10 @@ export default function HomePage() {
     >
       <div className="glass ipd-card w-full text-center relative overflow-hidden">
         <div className="ipd-header space-y-4">
-          <div className="ipd-icon w-16 h-16 bg-white/60 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-glass-border shadow-sm">
-            <span className="text-2xl">👁</span>
+          <div className="ipd-icon w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-glass-border">
+            <Eye size={26} className="text-main-brown" aria-hidden="true" />
           </div>
-          <h2 className="text-2xl font-bold text-main-brown tracking-tight">동공 간격(IPD) 입력</h2>
+          <h2 className="text-2xl font-bold text-main-brown">동공 간격(IPD) 입력</h2>
           <p className="text-sub-gray text-[14px] font-light leading-relaxed">보다 정밀한 가상 메이크업을 위해<br />본인의 동공 간격을 입력해주세요.</p>
         </div>
 
@@ -226,10 +192,10 @@ export default function HomePage() {
             onBlur={saveIpd}
             aria-label="동공 간격 밀리미터"
             aria-invalid={ipdInputError}
-            className="ipd-input w-full text-center text-7xl font-bold bg-transparent border-0 outline-none text-main-brown tracking-tighter"
+            className="ipd-input w-full text-center text-7xl font-bold bg-transparent border-0 outline-none text-main-brown"
             placeholder={String(IPD_CONFIG.defaultMm)}
           />
-          <span className="block mt-2 text-main-brown/40 font-bold text-sm tracking-widest uppercase">Millimeters</span>
+          <span className="block mt-2 text-main-brown/45 font-bold text-sm">mm</span>
           <div className="mt-4 min-h-5">
             {ipdInputError ? (
               <p className="text-xs font-bold text-main-brown">
@@ -260,7 +226,10 @@ export default function HomePage() {
         <button
           onClick={() => {
             const savedIpd = saveIpd();
-            if (savedIpd.source === 'input') setCurrentPage(Page.CAPTURE);
+            if (savedIpd.source === 'input') {
+              setAutoStartCapture(false);
+              setCurrentPage(Page.CAPTURE);
+            }
           }}
           aria-disabled={!currentIpdInput}
           className="btn btn-primary btn-full"
@@ -284,7 +253,7 @@ export default function HomePage() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.98, opacity: 0, y: 8 }}
               transition={{ duration: 0.16 }}
-              className="w-full max-w-xs rounded-3xl border border-main-brown/10 bg-white p-8 text-center shadow-[0_18px_42px_rgba(79,44,29,0.18)]"
+              className="w-full max-w-xs rounded-2xl border border-main-brown/10 bg-white p-8 text-center"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-main-brown/10 bg-main-brown/[0.04]">
@@ -329,11 +298,11 @@ export default function HomePage() {
           className="app-container justify-center bg-white px-6"
           aria-live="polite"
         >
-          <div className="rounded-lg border border-main-brown/10 bg-white p-7 text-center shadow-[0_12px_34px_rgba(79,44,29,0.08)]">
+          <div className="rounded-lg border border-main-brown/10 bg-white p-7 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-main-brown/[0.06] text-main-brown">
               <Icon size={24} className={recommendationState.status === 'loading' ? 'animate-spin' : undefined} aria-hidden="true" />
             </div>
-            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.24em] text-main-brown/45">
+            <p className="mt-5 text-[11px] font-bold text-main-brown/45">
               {recommendationState.status === 'loading' ? 'Recommendation Loading' : 'Recommendation Error'}
             </p>
             <h2 className="mt-2 text-[22px] font-bold leading-tight text-main-brown">
@@ -390,7 +359,7 @@ export default function HomePage() {
             <button
               type="button"
               onClick={goBack}
-              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-main-brown/10 bg-white text-main-brown shadow-[0_8px_20px_rgba(79,44,29,0.12)] transition hover:border-main-brown/25 focus-visible:outline focus-visible:outline-3 focus-visible:outline-main-brown/20"
+              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-main-brown/10 bg-white text-main-brown transition hover:border-main-brown/25 focus-visible:outline focus-visible:outline-3 focus-visible:outline-main-brown/20"
               aria-label="이전 화면"
             >
               <ChevronLeft size={22} aria-hidden="true" />
@@ -401,12 +370,12 @@ export default function HomePage() {
 
       <AnimatePresence mode="wait">
         {currentPage === Page.SPLASH && SplashPage()}
-        {currentPage === Page.INTRO && IntroPage()}
         {currentPage === Page.IPD_INPUT && IPDPage()}
         {currentPage === Page.CAPTURE && (
           <CapturePage
             key="capture"
             ipdMm={ipd}
+            autoStartCamera={autoStartCapture}
             onAnalysisComplete={handleAnalysisComplete}
           />
         )}
@@ -421,7 +390,10 @@ export default function HomePage() {
             selectedStyle={selectedStyle}
             onSelectedStyleChange={setSelectedStyle}
             onRetry={restartScan}
-            onApplyStyle={() => setCurrentPage(Page.IPD_INPUT)}
+            onApplyStyle={() => {
+              setAutoStartCapture(false);
+              setCurrentPage(Page.IPD_INPUT);
+            }}
           />
         )}
       </AnimatePresence>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertCircle, Camera, Loader2, Settings } from 'lucide-react';
 import { cn } from '../utils';
@@ -9,6 +9,9 @@ import { CameraPreview } from './CameraPreview';
 import { Controls } from './Controls';
 import type { CameraPermissionState, FaceAnalysisResult } from '../../../types';
 import { buildEyebrowRecommendationState } from '../../../usecases/eyebrow-recommendations';
+
+const AUTO_ANALYSIS_DELAY_MS = 650;
+const ANALYSIS_TRANSITION_DELAY_MS = 450;
 
 const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>, React.ComponentType<{ size?: number; className?: string }>> = {
   idle: Camera,
@@ -19,11 +22,15 @@ const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>,
 
 interface CapturePageProps {
   ipdMm: number;
+  autoStartCamera?: boolean;
   onAnalysisComplete: (capturedImage: string, analysis: FaceAnalysisResult) => void;
 }
 
-export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
+export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete }: CapturePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const autoAnalysisTimerRef = useRef<number | null>(null);
+  const autoAnalysisStartedRef = useRef(false);
+  const latestAnalysisRef = useRef<FaceAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const {
     videoRef,
@@ -41,59 +48,91 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
     stopCameraStream,
   } = useFaceMeshTracker({ ipdMm });
 
-  const processAnalysis = (capturedImage: string) => {
-    if (!analysis) return;
+  useEffect(() => {
+    latestAnalysisRef.current = analysis;
+  }, [analysis]);
 
-    setIsAnalyzing(true);
-    window.setTimeout(() => {
-      onAnalysisComplete(capturedImage, analysis);
-      setIsAnalyzing(false);
-    }, 450);
-  };
+  useEffect(() => {
+    if (!autoStartCamera || cameraPermission !== 'idle' || isAnalyzing) return;
 
-  const handleCapture = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    void requestCameraPermission();
+  }, [autoStartCamera, cameraPermission, isAnalyzing, requestCameraPermission]);
+
+  useEffect(() => () => {
+    if (autoAnalysisTimerRef.current !== null) {
+      window.clearTimeout(autoAnalysisTimerRef.current);
+    }
+  }, []);
+
+  const captureCurrentFrame = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return null;
 
     const video = videoRef.current;
+    if (video.videoWidth <= 0 || video.videoHeight <= 0) return null;
+
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return null;
 
+    ctx.save();
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg');
+    ctx.restore();
+
+    return canvas.toDataURL('image/jpeg');
+  }, [videoRef]);
+
+  const completeAnalysis = useCallback((capturedImage: string) => {
+    const currentAnalysis = latestAnalysisRef.current;
+    if (!currentAnalysis) {
+      autoAnalysisStartedRef.current = false;
+      return;
+    }
+
+    setIsAnalyzing(true);
     stopCameraStream();
-    processAnalysis(dataUrl);
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const dataUrl = loadEvent.target?.result;
-      if (typeof dataUrl !== 'string') return;
-
-      stopCameraStream();
-      processAnalysis(dataUrl);
-    };
-    reader.readAsDataURL(file);
-  };
+    window.setTimeout(() => {
+      onAnalysisComplete(capturedImage, currentAnalysis);
+      setIsAnalyzing(false);
+    }, ANALYSIS_TRANSITION_DELAY_MS);
+  }, [onAnalysisComplete, stopCameraStream]);
 
   const alignmentReady = Boolean(alignment.ready ?? (
     alignment.detected && alignment.centered && alignment.distanceOk && alignment.pitchOk && alignment.yawOk
   ));
   const captureReady = Boolean(analysis);
+
+  useEffect(() => {
+    if (cameraPermission !== 'granted' || !analysis) {
+      autoAnalysisStartedRef.current = false;
+      return;
+    }
+
+    if (!captureReady || isAnalyzing || autoAnalysisStartedRef.current) return;
+
+    autoAnalysisStartedRef.current = true;
+    autoAnalysisTimerRef.current = window.setTimeout(() => {
+      autoAnalysisTimerRef.current = null;
+      const capturedImage = captureCurrentFrame();
+
+      if (!capturedImage) {
+        autoAnalysisStartedRef.current = false;
+        return;
+      }
+
+      completeAnalysis(capturedImage);
+    }, AUTO_ANALYSIS_DELAY_MS);
+  }, [analysis, cameraPermission, captureCurrentFrame, captureReady, completeAnalysis, isAnalyzing]);
+
   const liveRecommendation = useMemo(() => {
-    if (!captureReady) return null;
+    if (!analysis) return null;
 
     const recommendationState = buildEyebrowRecommendationState(analysis);
     return recommendationState.status === 'ready' ? recommendationState.recommendations[0] ?? null : null;
-  }, [captureReady, analysis]);
+  }, [analysis]);
   const captureBlockedState = useMemo(() => {
     if (captureReady) return null;
 
@@ -143,14 +182,14 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
     <div className="app-container relative bg-white px-3 pb-[calc(92px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))]">
       <div className="mb-2 flex items-center justify-between gap-3 pl-[52px] pr-1">
         <div className="min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-main-brown/45">AR Capture</p>
+          <p className="text-[10px] font-bold text-main-brown/55">AR 캡처</p>
           <h2 className="mt-0.5 truncate text-[18px] font-bold leading-tight text-main-brown">얼굴 정렬 후 촬영</h2>
         </div>
         <div
           className={cn(
-            "flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 text-[10px] font-bold",
+            "flex shrink-0 items-center gap-2 rounded-2xl border px-2.5 py-1.5 text-[10px] font-bold",
             captureReady
-              ? "border-green-500/20 bg-green-500/10 text-main-brown"
+              ? "border-main-brown bg-white text-main-brown"
               : "border-main-brown/10 bg-main-brown/5 text-sub-gray"
           )}
           aria-live="polite"
@@ -158,10 +197,10 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              captureReady ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.55)]" : "bg-main-brown/25"
+              captureReady ? "bg-main-brown" : "bg-main-brown/25"
             )}
           />
-          {captureReady ? '촬영 가능' : alignmentReady ? '분석 중' : '정렬 중'}
+          {captureReady ? '자동 분석' : alignmentReady ? '분석 중' : '정렬 중'}
         </div>
       </div>
 
@@ -180,7 +219,6 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
         errorMessage={errorMessage}
         PermissionIcon={PermissionIcon}
         onRequestCameraPermission={requestCameraPermission}
-        onFileUpload={handleFileUpload}
       />
 
       {cameraPermission === 'granted' && (
@@ -189,8 +227,6 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
           analysisReady={captureReady}
           disabledLabel={captureBlockedState?.label}
           disabledDescription={captureBlockedState?.description}
-          onCapture={handleCapture}
-          onFileUpload={handleFileUpload}
         />
       )}
 
@@ -202,7 +238,7 @@ export function CapturePage({ ipdMm, onAnalysisComplete }: CapturePageProps) {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-white/95 px-8"
           >
-            <div className="w-full max-w-[300px] rounded-3xl border border-main-brown/10 bg-white p-8 text-center shadow-[0_18px_44px_rgba(79,44,29,0.14)]">
+            <div className="w-full max-w-[300px] rounded-2xl border border-main-brown/10 bg-white p-8 text-center">
               <div className="relative mx-auto h-36 w-28 overflow-hidden rounded-[46%] border-2 border-main-brown/30 bg-main-brown/[0.03]">
                 <motion.div
                   className="absolute left-3 right-3 h-8 rounded-full bg-main-brown/10"

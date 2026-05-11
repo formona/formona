@@ -1,18 +1,13 @@
 "use client";
 
-import type React from 'react';
-import { ChevronRight, RefreshCw, Upload } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import { CAMERA_PERMISSION_COPY } from '../../../constants';
 import type { CameraPermissionState } from '../../../types';
-
-type FileUploadHandler = (event: React.ChangeEvent<HTMLInputElement>) => void;
 
 type PermissionControlsProps = {
   mode: 'permission';
   cameraPermission: Exclude<CameraPermissionState, 'granted'>;
   onRequestCameraPermission: () => void;
-  onFileUpload: FileUploadHandler;
-  allowFileUpload?: boolean;
 };
 
 type CaptureControlsProps = {
@@ -20,8 +15,6 @@ type CaptureControlsProps = {
   analysisReady: boolean;
   disabledLabel?: string;
   disabledDescription?: string;
-  onCapture: () => void;
-  onFileUpload: FileUploadHandler;
 };
 
 type ResultControlsProps = {
@@ -46,48 +39,36 @@ export const Controls = (props: ControlsProps) => {
         >
           {permissionCopy.actionLabel}
         </button>
-        {props.allowFileUpload !== false && props.cameraPermission !== 'idle' && (
-          <label className="btn btn-secondary btn-compact cursor-pointer">
-            이미지 수동 업로드
-            <input type="file" accept="image/*" className="hidden" onChange={props.onFileUpload} />
-          </label>
-        )}
       </div>
     );
   }
 
   if (props.mode === 'capture') {
-    const captureLabel = props.analysisReady ? '촬영하고 추천 보기' : props.disabledLabel ?? '얼굴 정렬 필요';
+    const captureLabel = props.analysisReady ? '자동 분석 중' : props.disabledLabel ?? '얼굴 정렬 필요';
     const captureDescription = props.analysisReady
-      ? '준비가 완료되었습니다. 촬영하면 추천 단계로 이동합니다.'
+      ? '얼굴 기준점이 확인되었습니다. 추천 화면으로 자동 이동합니다.'
       : props.disabledDescription ?? '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.';
 
     return (
-      <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-main-brown/10 bg-white/[0.94] px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_34px_rgba(79,44,29,0.10)] backdrop-blur-xl">
-        <p className="mb-2 text-center text-[11px] font-medium leading-snug text-sub-gray">
+      <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-main-brown/10 bg-white px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
+        <p className="mb-2 text-center text-[11px] font-light leading-snug text-sub-gray">
           {captureDescription}
         </p>
-        <div className="flex w-full gap-2.5">
-          <label className="btn btn-secondary btn-icon cursor-pointer shrink-0" aria-label="이미지 수동 업로드">
-            <Upload size={20} className="text-main-brown opacity-60" />
-            <input type="file" accept="image/*" className="hidden" onChange={props.onFileUpload} />
-          </label>
-          <button
-            type="button"
-            onClick={props.onCapture}
-            disabled={!props.analysisReady}
-            className="btn btn-primary min-h-[56px] flex-1 text-[16px]"
-          >
-            {captureLabel}
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled
+          className="btn btn-primary min-h-[56px] w-full text-[16px]"
+          aria-live="polite"
+        >
+          {captureLabel}
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-main-brown/10 bg-white/[0.96] px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-4 shadow-[0_-12px_34px_rgba(79,44,29,0.10)] backdrop-blur-xl">
-      <p className="mb-3 text-center text-[12px] font-medium leading-relaxed text-sub-gray">
+    <div className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-main-brown/10 bg-white px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-4">
+      <p className="mb-3 text-center text-[12px] font-light leading-relaxed text-sub-gray">
         AR 미리보기를 확인한 뒤 다시 촬영하거나 처음 단계로 돌아가세요.
       </p>
       <div className="flex gap-3">
