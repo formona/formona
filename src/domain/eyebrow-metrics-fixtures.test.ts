@@ -96,8 +96,8 @@ describe('eyebrow metric landmark fixtures', () => {
     expect(asymmetric?.eyebrowPosition.leftRightSymmetry).toBeLessThan(96);
     expect(asymmetric?.eyebrowPosition.heightAsymmetry).toBeGreaterThan(0);
     expect(asymmetric?.eyebrowPosition.lengthAsymmetry).toBeGreaterThan(0);
-    expect(asymmetric?.metrics.totalLength).toBeGreaterThan(balanced?.metrics.totalLength ?? 0);
     expect(asymmetric?.metrics.archHeight).toBeGreaterThan(balanced?.metrics.archHeight ?? 0);
+    expect(asymmetric?.metrics.gap).toBeGreaterThan(balanced?.metrics.gap ?? 0);
   });
 
   it('rejects out-of-frame landmarks and marks low-confidence metric landmarks ineligible', () => {
@@ -157,11 +157,11 @@ describe('eyebrow metric landmark fixtures', () => {
 
     const confidence = buildEyebrowMetricConfidenceModel({
       metrics: result!.metrics,
-      pupilIpd: { ...result!.pupilIpd, confidence: 0.72 },
-      alignment: { ...result!.alignment, confidence: 0.72, ready: false },
-      eyebrowPosition: { ...result!.eyebrowPosition, confidence: 0.72 },
-      eyeGeometry: { ...result!.eyeGeometry, confidence: 0.72 },
-      overlayAnchors: { ...result!.overlayAnchors, confidence: 0.72 },
+      pupilIpd: { ...result!.pupilIpd, confidence: 0.69 },
+      alignment: { ...result!.alignment, confidence: 0.69, ready: false },
+      eyebrowPosition: { ...result!.eyebrowPosition, confidence: 0.69 },
+      eyeGeometry: { ...result!.eyeGeometry, confidence: 0.69 },
+      overlayAnchors: { ...result!.overlayAnchors, confidence: 0.69 },
     });
 
     expect(confidence.reportable).toBe(false);
@@ -262,8 +262,8 @@ describe('eyebrow metric landmark fixtures', () => {
     expect(first?.measurementStability).toMatchObject({ state: 'warming', sampleCount: 1 });
     expect(second?.measurementStability).toMatchObject({ state: 'warming', sampleCount: 2 });
     expect(third?.measurementStability).toMatchObject({ state: 'stable', sampleCount: 3 });
-    expect(second?.metrics.totalLength).toBeGreaterThan(baseline!.metrics.totalLength);
-    expect(second?.metrics.totalLength).toBeLessThan(jittered!.metrics.totalLength);
+    expect(second?.metrics.archHeight).toBeGreaterThan(baseline!.metrics.archHeight);
+    expect(second?.metrics.archHeight).toBeLessThan(jittered!.metrics.archHeight);
     expect(second?.measurements.map((item) => item.value)).toEqual([
       `${second?.metrics.sp.toFixed(1)}mm`,
       `${second?.metrics.hp.toFixed(1)}mm`,

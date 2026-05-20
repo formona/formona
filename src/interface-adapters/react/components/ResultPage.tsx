@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { motion } from 'motion/react';
-import { AlertCircle, Camera, Loader2, Settings } from 'lucide-react';
+import { AlertCircle, Camera, Download, Loader2, Settings } from 'lucide-react';
 import { IPD_CONFIG } from '../../../constants';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../../domain/measurement-copy';
+import { buildMeasurementDataPayload } from '../../../domain/measurement-payload';
 import { buildEyebrowRecommendationState, buildEyebrowRecommendationStateFromContext } from '../../../usecases/eyebrow-recommendations';
 import { cn } from '../utils';
 import {
@@ -71,12 +72,11 @@ const buildDisplayedMeasurements = (analysis: FaceAnalysisResult | null): Measur
     ));
     const value = analysis.metrics[row.key];
     const confidence = analysis.metricConfidence?.metrics[row.key] ?? existing?.confidence;
-    const reportable = confidence?.reportable ?? analysis.metricConfidence?.reportable ?? true;
 
     return {
       label: row.label,
       description: existing?.description ?? row.description,
-      value: reportable && Number.isFinite(value) ? `${value.toFixed(1)}mm` : '-',
+      value: Number.isFinite(value) ? `${value.toFixed(1)}mm` : '-',
       confidence,
     };
   });
@@ -88,7 +88,7 @@ const getMeasurementGateMessage = (analysis: FaceAnalysisResult | null) => {
   const confidence = analysis.metricConfidence;
   if (!confidence || confidence.reportable) return null;
 
-  return `기준점 신뢰도 ${Math.round(confidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${confidence.maxEstimatedErrorMm.toFixed(1)}mm로 측정값 표시 기준을 넘었습니다.`;
+  return `기준점 신뢰도 ${Math.round(confidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${confidence.maxEstimatedErrorMm.toFixed(1)}mm입니다. 수치는 표시하고 데이터에는 검토 필요 품질 플래그를 함께 저장합니다.`;
 };
 
 const getLivePreviewMessage = ({
@@ -109,6 +109,23 @@ const getLivePreviewMessage = ({
   return `${selectedStyle?.name ?? '추천 눈썹'} 실시간 트레이싱 중`;
 };
 
+const downloadMeasurementData = (data: string) => {
+  const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+  const objectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+    ? URL.createObjectURL(blob)
+    : null;
+  const link = document.createElement('a');
+
+  link.href = objectUrl ?? `data:application/json;charset=utf-8,${encodeURIComponent(data)}`;
+  link.download = `formona-measurement-${Date.now()}.json`;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+};
+
 export function ResultPage({
   faceShape,
   analysis,
@@ -119,18 +136,21 @@ export function ResultPage({
   onApplyStyle,
 }: ResultPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [measurementSaveMessage, setMeasurementSaveMessage] = useState<string | null>(null);
   const recommendationState = recommendationContext
     ? buildEyebrowRecommendationStateFromContext(recommendationContext)
     : buildEyebrowRecommendationState(analysis);
   const recommendations = recommendationState.status === 'ready' ? recommendationState.recommendations : [];
   const measurements = buildDisplayedMeasurements(analysis);
   const measurementGateMessage = getMeasurementGateMessage(analysis);
+  const measurementPayload = useMemo(() => (
+    analysis ? buildMeasurementDataPayload({ analysis, selectedStyle }) : null
+  ), [analysis, selectedStyle]);
   const previewIpdMm = recommendationContext?.ipdMm ?? analysis?.ipdMm ?? IPD_CONFIG.defaultMm;
   const {
     videoRef,
     cameraPermission,
     trackerStatus,
-    latestLandmarks,
     liveOverlayAnchors,
     detectedFaceShape,
     alignment,
@@ -156,6 +176,17 @@ export function ResultPage({
     void requestCameraPermission();
   }, [cameraPermission, requestCameraPermission]);
 
+  useEffect(() => {
+    setMeasurementSaveMessage(null);
+  }, [measurementPayload]);
+
+  const handleSaveMeasurementData = useCallback(() => {
+    if (!measurementPayload) return;
+
+    downloadMeasurementData(JSON.stringify(measurementPayload, null, 2));
+    setMeasurementSaveMessage('측정 데이터가 생성되었습니다.');
+  }, [measurementPayload]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -173,7 +204,6 @@ export function ResultPage({
               alignment={alignment}
               detectedFaceShape={detectedFaceShape}
               liveOverlayAnchors={liveOverlayAnchors}
-              landmarks={latestLandmarks}
               selectedRecommendation={selectedStyle}
               ipdGuidance={ipdGuidance}
               frameGuidance={frameGuidance}
@@ -257,6 +287,26 @@ export function ResultPage({
                 <p className="mt-1 text-[11px] leading-relaxed text-sub-gray">{measurementGateMessage}</p>
               </div>
             )}
+
+            <div className="mx-2 flex items-center justify-between gap-3 rounded-lg border border-main-brown/10 bg-main-brown/[0.03] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold text-main-brown">포모나 전달용 데이터</p>
+                {measurementSaveMessage && (
+                  <p className="mt-1 text-[11px] font-bold text-sub-gray" aria-live="polite">
+                    {measurementSaveMessage}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveMeasurementData}
+                disabled={!measurementPayload}
+                className="btn btn-subtle min-h-11 shrink-0 rounded-lg px-3 text-[12px]"
+              >
+                <Download size={15} aria-hidden="true" />
+                데이터 저장
+              </button>
+            </div>
 
             <div className="space-y-4 px-2">
               {measurements.map((measurement) => (

@@ -1,9 +1,9 @@
 import type { EyebrowMetricKey, MeasurementDisplayItem } from './types';
 
 export const EYEBROW_METRIC_DISPLAY_ROWS = [
-  { key: 'sp', label: '눈썹 시작점 (SP)', description: '콧볼 수직선 기준' },
-  { key: 'hp', label: '눈썹 최고점 (HP)', description: '홍채 중심 수직선 기준' },
-  { key: 'ep', label: '눈썹 끝점 (EP)', description: '인중~눈꼬리 대각선 기준' },
+  { key: 'sp', label: '눈썹 시작점 (SP)', description: '콧볼~눈썹 시작점 수직선' },
+  { key: 'hp', label: '눈썹 최고점 (HP)', description: '홍채 중심~눈썹 최고점 수직선' },
+  { key: 'ep', label: '눈썹 끝점 (EP)', description: '인중~눈썹 끝점 대각선' },
   { key: 'totalLength', label: '눈썹 전체 길이', description: 'SP ~ EP 직선 거리' },
   { key: 'thickness', label: '눈썹 두께', description: '가장 두꺼운 지점' },
   { key: 'archHeight', label: '아치 높이', description: '기준선~HP 수직 거리' },

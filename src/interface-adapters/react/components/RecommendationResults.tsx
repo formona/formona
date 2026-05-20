@@ -9,6 +9,7 @@ import {
   type EyebrowStyle,
   type FaceShapeResultCopy,
 } from '../../../types';
+import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../../domain/measurement-copy';
 import { EyebrowStyleCarousel } from './EyebrowStyleCarousel';
 import { FaceShapeImage } from './FaceShapeImage';
 
@@ -37,11 +38,10 @@ export function RecommendationResults({
   const handleStyleSelect = useCallback((style: EyebrowStyle) => {
     setSelectedStyleId(style.id);
   }, []);
-  const metricHighlights = [
-    { label: '눈썹 길이', value: `${recommendationContext.metrics.totalLength.toFixed(1)}mm` },
-    { label: '아치 높이', value: `${recommendationContext.metrics.archHeight.toFixed(1)}mm` },
-    { label: '눈썹 간격', value: `${recommendationContext.metrics.gap.toFixed(1)}mm` },
-  ];
+  const measurementRows = EYEBROW_METRIC_DISPLAY_ROWS.map((row) => ({
+    ...row,
+    value: `${recommendationContext.metrics[row.key].toFixed(1)}mm`,
+  }));
 
   if (!selectedStyle) return null;
 
@@ -67,14 +67,14 @@ export function RecommendationResults({
             <p className="text-[14px] leading-relaxed text-sub-gray">{resultCopy.description}</p>
           </div>
 
-          {metricHighlights.length > 0 && (
+          {measurementRows.length > 0 && (
             <div
-              className="grid grid-cols-3 gap-2 rounded-lg border border-main-brown/10 bg-white p-3"
+              className="grid grid-cols-2 gap-2 rounded-lg border border-main-brown/10 bg-white p-3"
               aria-label={`IPD ${recommendationContext.ipdMm.toFixed(1)}mm 기준 추천 측정값`}
             >
-              {metricHighlights.map((metric) => (
-                <div key={metric.label} className="min-w-0 rounded-md bg-main-brown/[0.03] px-2 py-3 text-center">
-                  <p className="truncate text-[10px] font-bold text-sub-gray">{metric.label}</p>
+              {measurementRows.map((metric) => (
+                <div key={metric.key} className="min-w-0 rounded-md bg-main-brown/[0.03] px-2 py-3 text-center">
+                  <p className="break-keep text-[10px] font-bold leading-tight text-sub-gray">{metric.label}</p>
                   <p className="mt-1 text-[16px] font-bold leading-none text-main-brown tabular-nums">{metric.value}</p>
                 </div>
               ))}

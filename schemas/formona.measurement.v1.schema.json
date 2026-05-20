@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.formona.internal/formona.measurement.v1.schema.json",
+  "title": "Formona Measurement Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "measuredAtIso",
+    "faceShape",
+    "selectedStyle",
+    "ipdMm",
+    "pxToMmScale",
+    "pupilIpd",
+    "metrics",
+    "goldenRatioGuides",
+    "overlayAnchors",
+    "quality"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "formona.measurement.v1"
+    },
+    "measuredAtIso": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "faceShape": {
+      "type": "string",
+      "enum": ["계란형", "각형", "둥근형", "하트형"]
+    },
+    "selectedStyle": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "name"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "name": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "ipdMm": {
+      "type": "number",
+      "minimum": 45,
+      "maximum": 80
+    },
+    "pxToMmScale": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "pupilIpd": {
+      "$ref": "#/$defs/pupilIpd"
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "$ref": "#/$defs/metric"
+      },
+      "allOf": [
+        {
+          "contains": { "$ref": "#/$defs/metricSp" },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": { "$ref": "#/$defs/metricHp" },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": { "$ref": "#/$defs/metricEp" },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": { "$ref": "#/$defs/metricTotalLength" },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": { "$ref": "#/$defs/metricThickness" },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": { "$ref": "#/$defs/metricArchHeight" },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": { "$ref": "#/$defs/metricGap" },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "goldenRatioGuides": {
+      "$ref": "#/$defs/goldenRatioGuides"
+    },
+    "overlayAnchors": {
+      "$ref": "#/$defs/overlayAnchors"
+    },
+    "quality": {
+      "$ref": "#/$defs/quality"
+    }
+  },
+  "$defs": {
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nullableConfidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nullableNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "normalizedCoordinate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "normalizedPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "$ref": "#/$defs/normalizedCoordinate" },
+        "y": { "$ref": "#/$defs/normalizedCoordinate" }
+      }
+    },
+    "pixelPoint": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0 },
+            "y": { "type": "number", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "mmPoint": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0 },
+            "y": { "type": "number", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "measurementPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["normalized", "pixel", "mmFromFrameOrigin"],
+      "properties": {
+        "normalized": { "$ref": "#/$defs/normalizedPoint" },
+        "pixel": { "$ref": "#/$defs/pixelPoint" },
+        "mmFromFrameOrigin": { "$ref": "#/$defs/mmPoint" },
+        "source": {
+          "type": "string",
+          "enum": ["iris", "eye-center"]
+        }
+      }
+    },
+    "guideLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "lengthMm"],
+      "properties": {
+        "start": { "$ref": "#/$defs/measurementPoint" },
+        "end": { "$ref": "#/$defs/measurementPoint" },
+        "lengthMm": { "type": "number", "minimum": 0 }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "description",
+        "valueMm",
+        "displayValue",
+        "reportable",
+        "confidence",
+        "estimatedErrorMm"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "enum": ["sp", "hp", "ep", "totalLength", "thickness", "archHeight", "gap"]
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "valueMm": { "type": "number", "minimum": 0 },
+        "displayValue": { "type": "string", "pattern": "^[0-9]+(\\.[0-9])?mm$" },
+        "reportable": { "type": "boolean" },
+        "confidence": { "$ref": "#/$defs/nullableConfidence" },
+        "estimatedErrorMm": { "$ref": "#/$defs/nullableNonNegativeNumber" }
+      }
+    },
+    "metricSp": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "sp" } }
+    },
+    "metricHp": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "hp" } }
+    },
+    "metricEp": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "ep" } }
+    },
+    "metricTotalLength": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "totalLength" } }
+    },
+    "metricThickness": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "thickness" } }
+    },
+    "metricArchHeight": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "archHeight" } }
+    },
+    "metricGap": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "const": "gap" } }
+    },
+    "pupilIpd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "ipdPx", "normalizedIpd", "confidence"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["iris", "eye-center"]
+        },
+        "ipdPx": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        },
+        "normalizedIpd": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "goldenRatioSide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anchors", "lines", "distancesMm", "hpPositionRatio", "actualGoldenRatio"],
+      "properties": {
+        "anchors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sp", "hp", "ep", "goldenRatioTarget"],
+          "properties": {
+            "sp": { "$ref": "#/$defs/measurementPoint" },
+            "hp": { "$ref": "#/$defs/measurementPoint" },
+            "ep": { "$ref": "#/$defs/measurementPoint" },
+            "goldenRatioTarget": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/$defs/measurementPoint" }
+              ]
+            }
+          }
+        },
+        "lines": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sp", "hp", "ep"],
+              "properties": {
+                "sp": { "$ref": "#/$defs/guideLine" },
+                "hp": { "$ref": "#/$defs/guideLine" },
+                "ep": { "$ref": "#/$defs/guideLine" }
+              }
+            }
+          ]
+        },
+        "distancesMm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spToHp", "hpToEp", "spToEp", "hpHeight"],
+          "properties": {
+            "spToHp": { "type": "number", "minimum": 0 },
+            "hpToEp": { "type": "number", "minimum": 0 },
+            "spToEp": { "type": "number", "minimum": 0 },
+            "hpHeight": { "type": "number", "minimum": 0 }
+          }
+        },
+        "hpPositionRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "actualGoldenRatio": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "goldenRatioGuides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right", "average"],
+      "properties": {
+        "left": { "$ref": "#/$defs/goldenRatioSide" },
+        "right": { "$ref": "#/$defs/goldenRatioSide" },
+        "average": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spLineMm",
+            "hpLineMm",
+            "epLineMm",
+            "spToHpMm",
+            "hpToEpMm",
+            "spToEpMm",
+            "hpHeightMm",
+            "hpPositionRatio",
+            "actualGoldenRatio"
+          ],
+          "properties": {
+            "spLineMm": { "type": "number", "minimum": 0 },
+            "hpLineMm": { "type": "number", "minimum": 0 },
+            "epLineMm": { "type": "number", "minimum": 0 },
+            "spToHpMm": { "type": "number", "minimum": 0 },
+            "hpToEpMm": { "type": "number", "minimum": 0 },
+            "spToEpMm": { "type": "number", "minimum": 0 },
+            "hpHeightMm": { "type": "number", "minimum": 0 },
+            "hpPositionRatio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "actualGoldenRatio": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "overlayAnchorPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "$ref": "#/$defs/normalizedCoordinate" },
+        "y": { "$ref": "#/$defs/normalizedCoordinate" },
+        "source": {
+          "type": "string",
+          "enum": ["iris", "eye-center"]
+        }
+      }
+    },
+    "overlaySide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sp", "hp", "ep"],
+      "properties": {
+        "sp": { "$ref": "#/$defs/overlayAnchorPoint" },
+        "hp": { "$ref": "#/$defs/overlayAnchorPoint" },
+        "ep": { "$ref": "#/$defs/overlayAnchorPoint" }
+      }
+    },
+    "overlayAnchors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right", "confidence"],
+      "properties": {
+        "left": { "$ref": "#/$defs/overlaySide" },
+        "right": { "$ref": "#/$defs/overlaySide" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overallConfidence",
+        "maxEstimatedErrorMm",
+        "reportable",
+        "alignmentReady"
+      ],
+      "properties": {
+        "overallConfidence": { "$ref": "#/$defs/nullableConfidence" },
+        "maxEstimatedErrorMm": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "reportable": { "type": "boolean" },
+        "alignmentReady": { "type": "boolean" }
+      }
+    }
+  }
+}

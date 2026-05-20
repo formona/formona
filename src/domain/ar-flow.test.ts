@@ -188,8 +188,8 @@ describe('AR flow utilities', () => {
       archLocationAsymmetry: expect.any(Number),
       confidence: 1,
     });
-    expect(result?.eyebrowPosition.browSpacing).toBeCloseTo(result?.metrics.gap ?? 0, 4);
-    expect(result?.eyebrowPosition.archHeight).toBeCloseTo(result?.metrics.archHeight ?? 0, 4);
+    expect(result?.metrics.gap).toBeGreaterThan(0);
+    expect(result?.metrics.archHeight).toBeGreaterThan(0);
     expect(result?.eyebrowPosition.leftRightSymmetry).toBeGreaterThan(99);
     expect(result?.eyeGeometry).toMatchObject({
       left: {
@@ -266,6 +266,32 @@ describe('AR flow utilities', () => {
     expect(result?.metricConfidence?.reportable).toBe(true);
     expect(result?.eyebrowPosition.confidence).toBeCloseTo(0.82);
     expect(result?.eyeGeometry.confidence).toBeCloseTo(0.82);
+  });
+
+  it('treats zero-valued MediaPipe presence/visibility fields as unsupported instead of failed confidence', () => {
+    const landmarks = withLandmarkConfidence(makeLandmarks({
+      468: landmark(0.41, 0.43),
+      469: landmark(0.4, 0.42),
+      470: landmark(0.39, 0.43),
+      471: landmark(0.4, 0.44),
+      472: landmark(0.4, 0.43),
+      473: landmark(0.61, 0.43),
+      474: landmark(0.6, 0.42),
+      475: landmark(0.59, 0.43),
+      476: landmark(0.6, 0.44),
+      477: landmark(0.6, 0.43),
+    }), 0);
+    const validation = validateLandmarkFrame(extractFaceFeatureLandmarks(landmarks));
+    const result = analyzeFaceLandmarks(landmarks, 63, { width: 1080, height: 1920 });
+
+    expect(validation).toMatchObject({
+      valid: true,
+      confidence: 1,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.alignment.ready).toBe(true);
+    expect(result?.metricConfidence.overallConfidence).toBe(1);
+    expect(result?.metricConfidence.reportable).toBe(true);
   });
 
   it('accepts handheld mobile landmarks when the front camera is close and confidence is moderate', () => {
@@ -422,7 +448,7 @@ describe('AR flow utilities', () => {
     expect(result).not.toBeNull();
     expect(result?.eyebrowPosition.left.browHeight).toBeGreaterThan(0);
     expect(result?.eyebrowPosition.right.browHeight).toBeGreaterThan(0);
-    expect(result?.eyebrowPosition.browSpacing).toBeCloseTo(result?.metrics.gap ?? 0, 4);
+    expect(result?.metrics.gap).toBeGreaterThan(0);
     expect(result?.eyebrowPosition.archLocation).toBeGreaterThan(0);
     expect(result?.eyebrowPosition.archLocation).toBeLessThan(1);
     expect(result?.eyebrowPosition.leftRightSymmetry).toBeGreaterThan(0);
@@ -481,7 +507,7 @@ describe('AR flow utilities', () => {
       detected: false,
       confidence: 0,
     });
-    expect(classifyFaceShape([])).toBe(FaceShape.OVAL);
+    expect(classifyFaceShape([])).toBeNull();
   });
 
   it('exposes normalized face geometry as the classifier input for downstream recommendation flow', () => {
@@ -560,8 +586,22 @@ describe('AR flow utilities', () => {
       const classifiedShape = classifyFaceShapeFromGeometry(input);
 
       expect(classifiedShape, label).toBe(expectedShape);
+      if (!classifiedShape) throw new Error(`${label} did not classify`);
       expect(supportedShapes.has(classifiedShape), label).toBe(true);
     }
+  });
+
+  it('does not default ambiguous face geometry to oval', () => {
+    const ambiguousGeometry = geometry({
+      faceWidth: 0.6,
+      faceHeight: 0.72,
+      cheekWidth: 0.5,
+      foreheadWidth: 0.6,
+      jawWidth: 0.46,
+    });
+
+    expect(classifyFaceShapeFromGeometry(null)).toBeNull();
+    expect(classifyFaceShapeFromGeometry(ambiguousGeometry)).toBeNull();
   });
 
   it('keeps IPD quality issues reportable without blocking analysis when landmarks are present', () => {

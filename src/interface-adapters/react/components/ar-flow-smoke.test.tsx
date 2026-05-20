@@ -106,12 +106,42 @@ const mockOverlayAnchors: EyebrowOverlayAnchors = {
     hp: { x: 0.38, y: 0.31, source: 'iris' },
     ep: { x: 0.28, y: 0.35 },
     confidence: 1,
+    guides: {
+      spLine: {
+        start: { x: 0.44, y: 0.57 },
+        end: { x: 0.44, y: 0.35 },
+      },
+      hpLine: {
+        start: { x: 0.38, y: 0.43, source: 'iris' },
+        end: { x: 0.38, y: 0.31, source: 'iris' },
+      },
+      epLine: {
+        start: { x: 0.5, y: 0.66 },
+        end: { x: 0.28, y: 0.35 },
+      },
+      goldenRatioTarget: { x: 0.34, y: 0.35 },
+    },
   },
   right: {
     sp: { x: 0.56, y: 0.35 },
     hp: { x: 0.62, y: 0.31, source: 'iris' },
     ep: { x: 0.72, y: 0.35 },
     confidence: 1,
+    guides: {
+      spLine: {
+        start: { x: 0.56, y: 0.57 },
+        end: { x: 0.56, y: 0.35 },
+      },
+      hpLine: {
+        start: { x: 0.62, y: 0.43, source: 'iris' },
+        end: { x: 0.62, y: 0.31, source: 'iris' },
+      },
+      epLine: {
+        start: { x: 0.5, y: 0.66 },
+        end: { x: 0.72, y: 0.35 },
+      },
+      goldenRatioTarget: { x: 0.66, y: 0.35 },
+    },
   },
   confidence: 1,
   transform: {
@@ -303,6 +333,13 @@ const makeAnalysis = (): FaceAnalysisResult => ({
     right: 'M10,20 Q50,10 90,20',
     viewBox: '0 0 100 100',
   },
+  measurementStability: {
+    state: 'stable',
+    sampleCount: 4,
+    heldForMs: 0,
+    maxDeltaMm: 0.4,
+    smoothingAlpha: 0.35,
+  },
 });
 
 const renderCapturePage = (onAnalysisComplete = vi.fn()) => {
@@ -467,7 +504,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     });
   });
 
-  it('draws the live recommendation overlay with the freshest FaceMesh transform and clears it when the face is invalid', async () => {
+  it('draws the live recommendation overlay in preview pixel coordinates and clears it when the face is invalid', async () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       width: 390,
       height: 640,
@@ -509,15 +546,14 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
       expect(canvasContextMock.clearRect).toHaveBeenCalled();
       expect(canvasContextMock.quadraticCurveTo).toHaveBeenCalled();
       expect(canvasContextMock.stroke).toHaveBeenCalled();
-      expect(canvasContextMock.transform).toHaveBeenCalled();
+      expect(canvasContextMock.moveTo).toHaveBeenCalled();
     });
-    const [a, b, c, d, e, f] = canvasContextMock.transform.mock.calls[0];
-    expect(a).toBeCloseTo(81.06, 1);
-    expect(b).toBeCloseTo(83.2, 1);
-    expect(c).toBeCloseTo(-46.8, 1);
-    expect(d).toBeCloseTo(144.1, 1);
-    expect(e).toBeCloseTo(195, 1);
-    expect(f).toBeCloseTo(285.33, 1);
+    expect(canvasContextMock.arc).not.toHaveBeenCalled();
+    expect(canvasContextMock.transform).not.toHaveBeenCalled();
+    expect(canvasContextMock.moveTo.mock.calls[2][0]).toBeCloseTo(195, 1);
+    expect(canvasContextMock.moveTo.mock.calls[2][1]).toBeCloseTo(430.9, 1);
+    expect(canvasContextMock.lineTo.mock.calls[2][0]).toBeCloseTo(109.2, 1);
+    expect(canvasContextMock.lineTo.mock.calls[2][1]).toBeCloseTo(216, 1);
 
     vi.mocked(canvasContextMock.clearRect).mockClear();
     vi.mocked(canvasContextMock.quadraticCurveTo).mockClear();
@@ -576,7 +612,10 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
   });
 
-  it('starts automatic analysis when analysis exists even if metric reportability is low', () => {
+  it('continues capture when stable measurements carry a low-reportability quality flag', () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1080);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1920);
     const { onAnalysisComplete, rerender } = renderCapturePage();
     const lowReportabilityAnalysis = {
       ...makeAnalysis(),
@@ -596,8 +635,48 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
+    expect(screen.queryByText('측정값 재확인 필요')).not.toBeInTheDocument();
     expect(screen.getByText('자동 분석')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
+
+    act(() => {
+      vi.advanceTimersByTime(650);
+    });
+
+    expect(trackerMock.stopCameraStream).toHaveBeenCalledOnce();
+
+    act(() => {
+      vi.advanceTimersByTime(450);
+    });
+
+    expect(onAnalysisComplete).toHaveBeenCalledWith('data:image/jpeg;base64,monabrow', lowReportabilityAnalysis);
+  });
+
+  it('keeps capture blocked until measurement stability is stable', () => {
+    const { onAnalysisComplete, rerender } = renderCapturePage();
+    const warmingAnalysis = {
+      ...makeAnalysis(),
+      measurementStability: {
+        state: 'warming' as const,
+        sampleCount: 2,
+        heldForMs: 0,
+        maxDeltaMm: 0.4,
+        smoothingAlpha: 0.35,
+      },
+    };
+
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      alignment: readyAlignment,
+      analysis: warmingAnalysis,
+    };
+    rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
+
+    expect(screen.getByText('수치 안정화 중')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '수치 안정화 중' })).toBeDisabled();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
   it('surfaces AR fallback guidance when no face is visible', () => {
@@ -727,8 +806,14 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
 
     expect(screen.getByText('분석 완료')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: FACE_SHAPE_RESULT_COPY[FaceShape.ROUND].title })).toBeInTheDocument();
-    expect(screen.getByText('눈썹 길이')).toBeInTheDocument();
+    EYEBROW_METRIC_DISPLAY_ROWS.forEach((row) => {
+      expect(screen.getByText(row.label)).toBeInTheDocument();
+    });
+    expect(screen.getByText('18.2mm')).toBeInTheDocument();
+    expect(screen.getByText('33.4mm')).toBeInTheDocument();
+    expect(screen.getByText('49.1mm')).toBeInTheDocument();
     expect(screen.getByText('50.2mm')).toBeInTheDocument();
+    expect(screen.getByText('6.1mm')).toBeInTheDocument();
     expect(screen.getByText('7.3mm')).toBeInTheDocument();
     expect(screen.getByText('21.0mm')).toBeInTheDocument();
     expect(screen.getAllByText('각진 아치형').length).toBeGreaterThan(0);
@@ -869,7 +954,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByText('21.0mm')).toBeInTheDocument();
   });
 
-  it('gates eyebrow metric values when confidence is low or error exceeds the threshold', () => {
+  it('shows eyebrow metric values with a quality warning when confidence is low or error exceeds the threshold', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
     const selectedStyle = recommendations[0]!;
     const analysis = {
@@ -896,8 +981,12 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
 
     expect(screen.getByText('측정값 재확인 필요')).toBeInTheDocument();
     expect(screen.getByText(/예상 오차 최대 \+\/-5.6mm/)).toBeInTheDocument();
-    expect(screen.queryByText('18.2mm')).not.toBeInTheDocument();
-    expect(screen.queryByText('50.2mm')).not.toBeInTheDocument();
-    expect(screen.getAllByText('-')).toHaveLength(7);
+    expect(screen.getByText('18.2mm')).toBeInTheDocument();
+    expect(screen.getByText('33.4mm')).toBeInTheDocument();
+    expect(screen.getByText('49.1mm')).toBeInTheDocument();
+    expect(screen.getByText('50.2mm')).toBeInTheDocument();
+    expect(screen.getByText('6.1mm')).toBeInTheDocument();
+    expect(screen.getByText('7.3mm')).toBeInTheDocument();
+    expect(screen.getByText('21.0mm')).toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import { FaceShape, type FacePoint, type NormalizedFaceGeometry } from './types'
 export interface FaceShapeValidationFixture {
   id: string;
   label: string;
-  expectedShape: FaceShape;
+  expectedShape: FaceShape | null;
   landmarks: FacePoint[];
   geometry: NormalizedFaceGeometry;
   rationale: string;
@@ -63,8 +63,11 @@ const buildLandmarks = ({
   const bottomY = 0.5 + faceHeight / 2;
 
   Object.assign(landmarks, {
+    [FACE_MESH_LANDMARKS.noseBottomCenter]: point(0.5, 0.62),
     [FACE_MESH_LANDMARKS.forehead]: point(0.5, topY),
+    [FACE_MESH_LANDMARKS.upperLipCenter]: point(0.5, 0.66),
     [FACE_MESH_LANDMARKS.chin]: point(0.5, bottomY),
+    [FACE_MESH_LANDMARKS.leftNostril]: point(0.44, 0.57),
     [FACE_MESH_LANDMARKS.leftForehead]: point(forehead.left, 0.28),
     [FACE_MESH_LANDMARKS.rightForehead]: point(forehead.right, 0.28),
     [FACE_MESH_LANDMARKS.leftCheek]: point(cheek.left, 0.52),
@@ -75,6 +78,7 @@ const buildLandmarks = ({
     [FACE_MESH_LANDMARKS.leftEyeInner]: point(0.42, 0.43),
     [FACE_MESH_LANDMARKS.leftEyeTop]: point(0.38, 0.41),
     [FACE_MESH_LANDMARKS.leftEyeBottom]: point(0.38, 0.45),
+    [FACE_MESH_LANDMARKS.philtrum]: point(0.5, 0.6),
     [FACE_MESH_LANDMARKS.rightEyeOuter]: point(0.66, 0.43),
     [FACE_MESH_LANDMARKS.rightEyeInner]: point(0.58, 0.43),
     [FACE_MESH_LANDMARKS.rightEyeTop]: point(0.62, 0.41),
@@ -84,6 +88,7 @@ const buildLandmarks = ({
     [FACE_MESH_LANDMARKS.leftBrowOuter]: point(0.27, 0.36),
     [FACE_MESH_LANDMARKS.rightBrowInner]: point(0.58, 0.34),
     [FACE_MESH_LANDMARKS.rightBrowArch]: point(0.64, 0.31),
+    [FACE_MESH_LANDMARKS.rightNostril]: point(0.56, 0.57),
     [FACE_MESH_LANDMARKS.rightBrowOuter]: point(0.73, 0.36),
   });
 
@@ -102,7 +107,7 @@ const fixture = ({
 }: {
   id: string;
   label: string;
-  expectedShape: FaceShape;
+  expectedShape: FaceShape | null;
   faceHeight: number;
   foreheadWidth: number;
   cheekWidth: number;
@@ -194,23 +199,23 @@ export const FACE_SHAPE_BOUNDARY_FIXTURES: FaceShapeBoundaryFixture[] = [
   }),
   boundaryFixture('heart', {
     id: 'heart-below-forehead-threshold',
-    label: '계란형 just below heart forehead boundary',
-    expectedShape: FaceShape.OVAL,
+    label: '미분류 just below heart forehead boundary',
+    expectedShape: null,
     faceHeight: 0.7,
     foreheadWidth: 0.5145,
     cheekWidth: 0.5,
     jawWidth: 0.39,
-    rationale: 'A forehead ratio just under 1.03 should fall through to the oval fallback.',
+    rationale: 'A forehead ratio just under 1.03 should no longer fall through to oval without satisfying oval criteria.',
   }),
   boundaryFixture('heart', {
     id: 'heart-above-jaw-threshold',
-    label: '계란형 just above heart jaw boundary',
-    expectedShape: FaceShape.OVAL,
+    label: '미분류 just above heart jaw boundary',
+    expectedShape: null,
     faceHeight: 0.7,
     foreheadWidth: 0.515,
     cheekWidth: 0.5,
     jawWidth: 0.3905,
-    rationale: 'A jaw ratio just above 0.78 should no longer classify as heart.',
+    rationale: 'A jaw ratio just above 0.78 should no longer classify as heart or default to oval.',
   }),
   boundaryFixture('square', {
     id: 'square-at-lower-width-thresholds',
@@ -224,23 +229,23 @@ export const FACE_SHAPE_BOUNDARY_FIXTURES: FaceShapeBoundaryFixture[] = [
   }),
   boundaryFixture('square', {
     id: 'square-below-jaw-threshold',
-    label: '계란형 just below square jaw boundary',
-    expectedShape: FaceShape.OVAL,
+    label: '미분류 just below square jaw boundary',
+    expectedShape: null,
     faceHeight: 0.7,
     foreheadWidth: 0.43,
     cheekWidth: 0.5,
     jawWidth: 0.4295,
-    rationale: 'A jaw ratio just below 0.86 should fall through to the oval fallback.',
+    rationale: 'A jaw ratio just below 0.86 should not fall through to oval when it exceeds the oval taper range.',
   }),
   boundaryFixture('square', {
     id: 'square-above-width-delta-threshold',
-    label: '계란형 just above square width-delta boundary',
-    expectedShape: FaceShape.OVAL,
+    label: '미분류 just above square width-delta boundary',
+    expectedShape: null,
     faceHeight: 0.7,
     foreheadWidth: 0.591,
     cheekWidth: 0.5,
     jawWidth: 0.5,
-    rationale: 'A width delta above 0.18 should not be accepted as square.',
+    rationale: 'A width delta above 0.18 should not be accepted as square or default to oval.',
   }),
   boundaryFixture('round', {
     id: 'round-at-inclusive-thresholds',
@@ -254,22 +259,22 @@ export const FACE_SHAPE_BOUNDARY_FIXTURES: FaceShapeBoundaryFixture[] = [
   }),
   boundaryFixture('round', {
     id: 'round-above-height-threshold',
-    label: '계란형 just above round height boundary',
-    expectedShape: FaceShape.OVAL,
+    label: '미분류 just above round height boundary',
+    expectedShape: null,
     faceHeight: 0.611,
     foreheadWidth: 0.3,
     cheekWidth: 0.48,
     jawWidth: 0.5,
-    rationale: 'A height ratio just above 1.22 should fall through to the oval fallback.',
+    rationale: 'A height ratio just above 1.22 should not fall through to oval when the jaw remains the widest area.',
   }),
   boundaryFixture('round', {
     id: 'round-below-cheek-width-threshold',
-    label: '계란형 just below round cheek-width boundary',
-    expectedShape: FaceShape.OVAL,
+    label: '미분류 just below round cheek-width boundary',
+    expectedShape: null,
     faceHeight: 0.6,
     foreheadWidth: 0.3,
     cheekWidth: 0.479,
     jawWidth: 0.5,
-    rationale: 'A cheek-to-face-width ratio below 0.96 should no longer classify as round.',
+    rationale: 'A cheek-to-face-width ratio below 0.96 should no longer classify as round or default to oval.',
   }),
 ];
