@@ -290,21 +290,6 @@ const pointAtYOnLine = (
   };
 };
 
-const projectPointToLine = (
-  point: FacePoint,
-  start: FacePoint,
-  end: FacePoint,
-) => {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const lengthSquared = (dx * dx) + (dy * dy);
-  if (lengthSquared <= 0) return { ratioOnLine: 0 };
-
-  return {
-    ratioOnLine: (((point.x - start.x) * dx) + ((point.y - start.y) * dy)) / lengthSquared,
-  };
-};
-
 const blendPoints = (a: FacePoint, b: FacePoint, aWeight: number): FacePoint => {
   const safeWeight = Math.max(0, Math.min(1, aWeight));
   const bWeight = 1 - safeWeight;
@@ -313,6 +298,17 @@ const blendPoints = (a: FacePoint, b: FacePoint, aWeight: number): FacePoint => 
     x: (a.x * safeWeight) + (b.x * bWeight),
     y: (a.y * safeWeight) + (b.y * bWeight),
   };
+};
+
+const buildPhiltrumGuidePoint = (landmarks: readonly FacePoint[]): FacePoint | null => {
+  const noseBottom = getLandmarkPoint(landmarks, OVERLAY_REFERENCE_LANDMARKS.noseBottomCenter);
+  const upperLipCenter = getLandmarkPoint(landmarks, OVERLAY_REFERENCE_LANDMARKS.upperLipCenter);
+  if (hasFiniteNormalizedPoint(noseBottom) && hasFiniteNormalizedPoint(upperLipCenter)) {
+    return blendPoints(noseBottom, upperLipCenter, 0.4);
+  }
+
+  const philtrum = getLandmarkPoint(landmarks, OVERLAY_REFERENCE_LANDMARKS.philtrum);
+  return hasFiniteNormalizedPoint(philtrum) ? philtrum : null;
 };
 
 const irisOrEyeCenter = (
@@ -351,7 +347,7 @@ const buildOverlaySideAnchors = ({
   browConfidence,
   nostril,
   eyeCorner,
-  faceCenter,
+  philtrum,
   irisCenter,
   coordinateSpace,
 }: {
@@ -361,11 +357,11 @@ const buildOverlaySideAnchors = ({
   browConfidence: number;
   nostril: FaceRelativePoint | null;
   eyeCorner: FaceRelativePoint | null;
-  faceCenter: FaceRelativePoint | null;
+  philtrum: FaceRelativePoint | null;
   irisCenter: ReturnType<typeof irisOrEyeCenter>;
   coordinateSpace: FaceRelativeCoordinateSpace;
 }): EyebrowOverlaySideAnchors | null => {
-  if (!browInner || !browArch || !browOuter || !nostril || !eyeCorner || !faceCenter || !irisCenter.point) {
+  if (!browInner || !browArch || !browOuter || !nostril || !eyeCorner || !philtrum || !irisCenter.point) {
     return null;
   }
 
@@ -378,26 +374,34 @@ const buildOverlaySideAnchors = ({
   );
   const browBaselineY = (browInner.y + browOuter.y) / 2;
   const spBase = { x: nostril.x, y: browBaselineY };
-  const epBase = pointAtYOnLine(faceCenter, eyeCorner, browBaselineY);
+  const epBase = pointAtYOnLine(philtrum, eyeCorner, browBaselineY);
   const irisAnchorBase = { x: relativeIris.x, y: browArch.y };
-  const { ratioOnLine } = projectPointToLine(irisAnchorBase, spBase, epBase);
   const goldenRatioPoint = blendPoints(spBase, epBase, 1 - (1.618 / (1 + 1.618)));
-  const hpBase = ratioOnLine >= 0.58 && ratioOnLine <= 0.66
-    ? irisAnchorBase
-    : blendPoints(irisAnchorBase, goldenRatioPoint, 0.7);
   const archLift = Math.max(0.012 / coordinateSpace.scale, Math.abs(browBaselineY - browArch.y));
+  const hpBase = { x: irisAnchorBase.x, y: Math.min(irisAnchorBase.y, browBaselineY - archLift) };
   const sp = toOverlayAnchorPoint(spBase, coordinateSpace);
   const ep = toOverlayAnchorPoint(epBase, coordinateSpace);
-  const hp = toOverlayAnchorPoint(
-    { x: hpBase.x, y: Math.min(hpBase.y, browBaselineY - archLift) },
-    coordinateSpace,
-    irisCenter.source,
-  );
+  const hp = toOverlayAnchorPoint(hpBase, coordinateSpace, irisCenter.source);
 
   return {
     sp,
     hp,
     ep,
+    guides: {
+      spLine: {
+        start: toOverlayAnchorPoint(nostril, coordinateSpace),
+        end: sp,
+      },
+      hpLine: {
+        start: toOverlayAnchorPoint(relativeIris, coordinateSpace, irisCenter.source),
+        end: hp,
+      },
+      epLine: {
+        start: toOverlayAnchorPoint(philtrum, coordinateSpace),
+        end: ep,
+      },
+      goldenRatioTarget: toOverlayAnchorPoint(goldenRatioPoint, coordinateSpace),
+    },
     confidence: Math.min(browConfidence, irisCenter.confidence, coordinateSpace.confidence),
   };
 };
@@ -416,13 +420,10 @@ export const extractEyebrowOverlayAnchors = (
     return point && Number.isFinite(point.x) && Number.isFinite(point.y) ? point : null;
   };
 
-  const philtrum = getLandmarkPoint(landmarks, OVERLAY_REFERENCE_LANDMARKS.philtrum);
-  const upperLipCenter = getLandmarkPoint(landmarks, OVERLAY_REFERENCE_LANDMARKS.upperLipCenter);
-  const noseBottomCenter = getLandmarkPoint(landmarks, OVERLAY_REFERENCE_LANDMARKS.noseBottomCenter);
-  const faceCenter = averagePoints([philtrum, upperLipCenter, noseBottomCenter].filter(hasFiniteNormalizedPoint));
-  const relativeFaceCenter = faceCenter
+  const philtrum = buildPhiltrumGuidePoint(landmarks);
+  const relativePhiltrum = hasFiniteNormalizedPoint(philtrum)
     ? normalizePointToFaceSpace(
-      faceCenter,
+      philtrum,
       coordinateSpace.origin,
       coordinateSpace.xAxis,
       coordinateSpace.yAxis,
@@ -441,7 +442,7 @@ export const extractEyebrowOverlayAnchors = (
       ? normalizePointToFaceSpace(leftNostril, coordinateSpace.origin, coordinateSpace.xAxis, coordinateSpace.yAxis, coordinateSpace.scale)
       : null,
     eyeCorner: relativePoint(EYE_LANDMARKS.leftEyeOuter),
-    faceCenter: relativeFaceCenter,
+    philtrum: relativePhiltrum,
     irisCenter: irisOrEyeCenter(landmarks, IRIS_LANDMARKS.leftIris, EYE_LANDMARK_SETS.left),
     coordinateSpace,
   });
@@ -454,7 +455,7 @@ export const extractEyebrowOverlayAnchors = (
       ? normalizePointToFaceSpace(rightNostril, coordinateSpace.origin, coordinateSpace.xAxis, coordinateSpace.yAxis, coordinateSpace.scale)
       : null,
     eyeCorner: relativePoint(EYE_LANDMARKS.rightEyeOuter),
-    faceCenter: relativeFaceCenter,
+    philtrum: relativePhiltrum,
     irisCenter: irisOrEyeCenter(landmarks, IRIS_LANDMARKS.rightIris, EYE_LANDMARK_SETS.right),
     coordinateSpace,
   });

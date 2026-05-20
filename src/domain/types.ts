@@ -403,6 +403,19 @@ export interface EyebrowOverlaySideAnchors {
   hp: EyebrowOverlayAnchorPoint;
   ep: EyebrowOverlayAnchorPoint;
   confidence: number;
+  guides?: EyebrowGoldenRatioSideGuides;
+}
+
+export interface EyebrowGoldenRatioGuideLine {
+  start: EyebrowOverlayAnchorPoint;
+  end: EyebrowOverlayAnchorPoint;
+}
+
+export interface EyebrowGoldenRatioSideGuides {
+  spLine: EyebrowGoldenRatioGuideLine;
+  hpLine: EyebrowGoldenRatioGuideLine;
+  epLine: EyebrowGoldenRatioGuideLine;
+  goldenRatioTarget: EyebrowOverlayAnchorPoint;
 }
 
 export interface EyebrowOverlayTransform {
@@ -418,6 +431,24 @@ export interface EyebrowOverlayAnchors {
   right: EyebrowOverlaySideAnchors;
   confidence: number;
   transform: EyebrowOverlayTransform;
+}
+
+export interface EyebrowGoldenRatioSideMeasurements {
+  spLineMm: number;
+  hpLineMm: number;
+  epLineMm: number;
+  spToHpMm: number;
+  hpToEpMm: number;
+  spToEpMm: number;
+  hpHeightMm: number;
+  hpPositionRatio: number;
+  actualGoldenRatio: number;
+}
+
+export interface EyebrowGoldenRatioMeasurements {
+  left: EyebrowGoldenRatioSideMeasurements;
+  right: EyebrowGoldenRatioSideMeasurements;
+  average: EyebrowGoldenRatioSideMeasurements;
 }
 
 export interface FaceAnalysisResult {
@@ -436,6 +467,8 @@ export interface FaceAnalysisResult {
   pxToMmScale: number;
   alignment: FaceAlignment;
   overlayAnchors: EyebrowOverlayAnchors;
+  goldenRatioMeasurements: EyebrowGoldenRatioMeasurements;
   overlay: ArEyebrowPath;
+  videoDimensions?: VideoDimensions;
   measurementStability?: EyebrowMeasurementStability;
 }

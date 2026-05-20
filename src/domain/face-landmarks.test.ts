@@ -178,6 +178,16 @@ describe('FaceMesh landmark utilities', () => {
     expect(anchors?.right.hp.x).toBeLessThan(anchors?.right.ep.x ?? 1);
     expect(anchors?.left.hp.y).toBeLessThan(anchors?.left.sp.y ?? 0);
     expect(anchors?.right.hp.y).toBeLessThan(anchors?.right.sp.y ?? 0);
+    expect(anchors?.left.guides?.spLine).toMatchObject({
+      start: { x: 0.44, y: 0.57 },
+      end: { x: 0.44, y: 0.35 },
+    });
+    expect(anchors?.left.guides?.hpLine.start).toMatchObject({ source: 'iris', x: 0.4, y: 0.43 });
+    expect(anchors?.left.guides?.hpLine.end).toMatchObject({ source: 'iris', x: 0.4, y: 0.31 });
+    expect(anchors?.left.guides?.epLine.start).toMatchObject({ x: 0.5, y: 0.644 });
+    expect(anchors?.left.guides?.epLine.end.y).toBeCloseTo(anchors?.left.ep.y ?? 0);
+    expect(anchors?.left.guides?.goldenRatioTarget.x).toBeGreaterThan(anchors?.left.ep.x ?? 0);
+    expect(anchors?.left.guides?.goldenRatioTarget.x).toBeLessThan(anchors?.left.sp.x ?? 1);
   });
 
   it('falls back to eye-center overlay HP anchors when iris landmarks are unavailable', () => {

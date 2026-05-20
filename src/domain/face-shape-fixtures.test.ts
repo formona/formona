@@ -63,6 +63,7 @@ describe('face shape validation fixtures', () => {
   it('maps each classified fixture to the expected three eyebrow recommendations', () => {
     for (const fixture of FACE_SHAPE_VALIDATION_FIXTURES) {
       const detectedShape = classifyFaceShape(fixture.landmarks);
+      if (!detectedShape) throw new Error(`${fixture.id} did not classify to a supported face shape`);
       const recommendations = getEyebrowRecommendations(detectedShape);
 
       expect(detectedShape, fixture.id).toBe(fixture.expectedShape);

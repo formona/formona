@@ -9,6 +9,7 @@ import { CameraPreview } from './CameraPreview';
 import { Controls } from './Controls';
 import type { CameraPermissionState, FaceAnalysisResult } from '../../../types';
 import { buildEyebrowRecommendationState } from '../../../usecases/eyebrow-recommendations';
+import { EYEBROW_METRIC_DISPLAY_KEYS } from '../../../domain/measurement-copy';
 
 const AUTO_ANALYSIS_DELAY_MS = 650;
 const ANALYSIS_TRANSITION_DELAY_MS = 450;
@@ -26,6 +27,15 @@ interface CapturePageProps {
   onAnalysisComplete: (capturedImage: string, analysis: FaceAnalysisResult) => void;
 }
 
+const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null) => Boolean(
+  analysis
+    && analysis.alignment.ready
+    && analysis.measurementStability?.state === 'stable'
+    && EYEBROW_METRIC_DISPLAY_KEYS.every((key) => (
+      Number.isFinite(analysis.metrics[key]) && analysis.metrics[key] > 0
+    )),
+);
+
 export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete }: CapturePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const autoAnalysisTimerRef = useRef<number | null>(null);
@@ -36,7 +46,6 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
     videoRef,
     cameraPermission,
     trackerStatus,
-    latestLandmarks,
     liveOverlayAnchors,
     detectedFaceShape,
     analysis,
@@ -103,10 +112,10 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
   const alignmentReady = Boolean(alignment.ready ?? (
     alignment.detected && alignment.centered && alignment.distanceOk && alignment.pitchOk && alignment.yawOk
   ));
-  const captureReady = Boolean(analysis);
+  const captureReady = isMeasurementReadyForResult(analysis);
 
   useEffect(() => {
-    if (cameraPermission !== 'granted' || !analysis) {
+    if (cameraPermission !== 'granted' || !analysis || !captureReady) {
       autoAnalysisStartedRef.current = false;
       return;
     }
@@ -135,6 +144,24 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
   }, [analysis]);
   const captureBlockedState = useMemo(() => {
     if (captureReady) return null;
+
+    if (
+      analysis?.metricConfidence
+      && !analysis.metricConfidence.reportable
+      && analysis.measurementStability?.state !== 'stable'
+    ) {
+      return {
+        label: '측정값 재확인 필요',
+        description: `기준점 신뢰도 ${Math.round(analysis.metricConfidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${analysis.metricConfidence.maxEstimatedErrorMm.toFixed(1)}mm입니다. 얼굴을 정면으로 고정해주세요.`,
+      };
+    }
+
+    if (analysis) {
+      return {
+        label: '수치 안정화 중',
+        description: '측정값이 연속 프레임에서 안정될 때까지 얼굴과 휴대폰을 잠시 고정해주세요.',
+      };
+    }
 
     if (!alignment.detected || frameGuidance?.reason === 'missing_face') {
       return {
@@ -175,7 +202,7 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
       label: '얼굴 위치 조정',
       description: alignment.guidance || '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.',
     };
-  }, [alignment.detected, alignment.guidance, alignmentReady, captureReady, frameGuidance, ipdGuidance]);
+  }, [alignment.detected, alignment.guidance, analysis, alignmentReady, captureReady, frameGuidance, ipdGuidance]);
   const PermissionIcon = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_ICONS[cameraPermission];
 
   return (
@@ -212,7 +239,6 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
         alignment={alignment}
         detectedFaceShape={detectedFaceShape}
         liveOverlayAnchors={liveOverlayAnchors}
-        landmarks={latestLandmarks}
         selectedRecommendation={liveRecommendation}
         ipdGuidance={ipdGuidance}
         frameGuidance={frameGuidance}

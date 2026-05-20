@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CAMERA_PERMISSION_COPY } from '../../../constants';
 import type { CameraPermissionState } from '../../../types';
 import type {
+  EyebrowGoldenRatioSideGuides,
   EyebrowOverlayAnchors,
   EyebrowStyle,
   FaceAlignment,
@@ -15,11 +16,7 @@ import type {
   LandmarkFrameGuidance,
 } from '../../../domain/types';
 import { buildRecommendedEyebrowControlGeometry, type BrowControlPoints, type RecommendedEyebrowRenderMode } from '../../../domain/eyebrow-geometry';
-import {
-  buildPreviewCoordinateMapping,
-  mapLandmarksToPreviewPixels,
-  mapNormalizedPointToPreviewPixel,
-} from '../../../domain/preview-landmarks';
+import { mapNormalizedPointToPreviewPixel } from '../../../domain/preview-landmarks';
 import { cn } from '../utils';
 import { Controls } from './Controls';
 import { FaceGuidance, type TrackerStatus } from './FaceGuidance';
@@ -32,7 +29,6 @@ interface CameraPreviewProps {
   alignment: FaceAlignment;
   detectedFaceShape?: FaceShape | null;
   liveOverlayAnchors?: EyebrowOverlayAnchors | null;
-  landmarks?: FacePoint[];
   selectedRecommendation?: EyebrowStyle | null;
   ipdGuidance: IpdMeasurementGuidance | null;
   frameGuidance: LandmarkFrameGuidance | null;
@@ -44,13 +40,24 @@ interface CameraPreviewProps {
   guidanceMode?: 'capture' | 'preview';
 }
 
-interface FaceLocalBrowControlPoints {
+interface PreviewBrowControlPoints {
   sp: FacePoint;
   hp: FacePoint;
   ep: FacePoint;
   lowerSp: FacePoint;
   lowerHp: FacePoint;
   lowerEp: FacePoint;
+}
+
+interface PreviewGuideLine {
+  start: FacePoint;
+  end: FacePoint;
+}
+
+interface PreviewGuideLines {
+  spLine: PreviewGuideLine;
+  hpLine: PreviewGuideLine;
+  epLine: PreviewGuideLine;
 }
 
 export const CameraPreview = ({
@@ -61,7 +68,6 @@ export const CameraPreview = ({
   alignment,
   detectedFaceShape = null,
   liveOverlayAnchors = null,
-  landmarks = [],
   selectedRecommendation = null,
   ipdGuidance,
   frameGuidance,
@@ -148,14 +154,12 @@ export const CameraPreview = ({
       selectedRecommendation,
       liveOverlayAnchors,
     );
-    const overlayTransform = liveOverlayAnchors?.transform;
 
     if (
       cameraPermission !== 'granted'
       || !alignment.ready
       || !liveOverlayAnchors
       || !recommendationGeometry
-      || !overlayTransform
       || previewDimensions.width <= 0
       || previewDimensions.height <= 0
       || videoDimensions.width <= 0
@@ -164,46 +168,83 @@ export const CameraPreview = ({
       return;
     }
 
-    const transform = overlayTransform;
-    const previewMapping = buildPreviewCoordinateMapping(videoDimensions, previewDimensions);
-    const transformOrigin = mapNormalizedPointToPreviewPixel(transform.origin, videoDimensions, previewDimensions);
-    if (!previewMapping || !transformOrigin || !Number.isFinite(transform.scale) || transform.scale <= 0) return;
-
-    const cos = Math.cos(transform.rotationRadians);
-    const sin = Math.sin(transform.rotationRadians);
-    const xAxis = { x: cos, y: sin };
-    const yAxis = { x: -sin, y: cos };
-    const faceScaleX = transform.scale * videoDimensions.width * previewMapping.scale;
-    const faceScaleY = transform.scale * videoDimensions.height * previewMapping.scale;
-    const averageFaceScale = Math.max(1, (Math.abs(faceScaleX) + Math.abs(faceScaleY)) / 2);
-
-    const toFaceLocalPoint = (point: FacePoint): FacePoint => {
-      const dx = point.x - transform.origin.x;
-      const dy = point.y - transform.origin.y;
-
-      return {
-        x: ((dx * xAxis.x) + (dy * xAxis.y)) / transform.scale,
-        y: ((dx * yAxis.x) + (dy * yAxis.y)) / transform.scale,
-        z: point.z,
-      };
+    const toPreviewPoint = (point: FacePoint): FacePoint | null => {
+      const mappedPoint = mapNormalizedPointToPreviewPixel(point, videoDimensions, previewDimensions);
+      return mappedPoint ? { x: mappedPoint.x, y: mappedPoint.y, z: mappedPoint.z } : null;
     };
 
-    const mapControlPoints = (points: BrowControlPoints): FaceLocalBrowControlPoints => {
+    const mapControlPoints = (points: BrowControlPoints): PreviewBrowControlPoints | null => {
+      const sp = toPreviewPoint(points.sp);
+      const hp = toPreviewPoint(points.hp);
+      const ep = toPreviewPoint(points.ep);
+      const lowerSp = toPreviewPoint(points.lowerSp);
+      const lowerHp = toPreviewPoint(points.lowerHp);
+      const lowerEp = toPreviewPoint(points.lowerEp);
+      if (!sp || !hp || !ep || !lowerSp || !lowerHp || !lowerEp) return null;
+
       return {
-        sp: toFaceLocalPoint(points.sp),
-        hp: toFaceLocalPoint(points.hp),
-        ep: toFaceLocalPoint(points.ep),
-        lowerSp: toFaceLocalPoint(points.lowerSp),
-        lowerHp: toFaceLocalPoint(points.lowerHp),
-        lowerEp: toFaceLocalPoint(points.lowerEp),
+        sp,
+        hp,
+        ep,
+        lowerSp,
+        lowerHp,
+        lowerEp,
       };
     };
 
     const left = mapControlPoints(recommendationGeometry.left);
     const right = mapControlPoints(recommendationGeometry.right);
+    if (!left || !right) return;
+
+    const mapAnchorPoint = (point: FacePoint): FacePoint | null => toPreviewPoint(point);
+    const leftGuides = {
+      sp: mapAnchorPoint(liveOverlayAnchors.left.sp),
+      hp: mapAnchorPoint(liveOverlayAnchors.left.hp),
+      ep: mapAnchorPoint(liveOverlayAnchors.left.ep),
+    };
+    const rightGuides = {
+      sp: mapAnchorPoint(liveOverlayAnchors.right.sp),
+      hp: mapAnchorPoint(liveOverlayAnchors.right.hp),
+      ep: mapAnchorPoint(liveOverlayAnchors.right.ep),
+    };
+    if (!leftGuides.sp || !leftGuides.hp || !leftGuides.ep || !rightGuides.sp || !rightGuides.hp || !rightGuides.ep) {
+      return;
+    }
+    const leftGuideAnchors = {
+      sp: leftGuides.sp,
+      hp: leftGuides.hp,
+      ep: leftGuides.ep,
+    };
+    const rightGuideAnchors = {
+      sp: rightGuides.sp,
+      hp: rightGuides.hp,
+      ep: rightGuides.ep,
+    };
+
+    const mapGuideLine = (line: EyebrowGoldenRatioSideGuides['spLine']): PreviewGuideLine | null => {
+      const start = toPreviewPoint(line.start);
+      const end = toPreviewPoint(line.end);
+      return start && end ? { start, end } : null;
+    };
+    const mapGuideLines = (guides?: EyebrowGoldenRatioSideGuides): PreviewGuideLines | null => {
+      if (!guides) return null;
+
+      const spLine = mapGuideLine(guides.spLine);
+      const hpLine = mapGuideLine(guides.hpLine);
+      const epLine = mapGuideLine(guides.epLine);
+      if (!spLine || !hpLine || !epLine) return null;
+
+      return {
+        spLine,
+        hpLine,
+        epLine,
+      };
+    };
+    const leftGuideLines = mapGuideLines(liveOverlayAnchors.left.guides);
+    const rightGuideLines = mapGuideLines(liveOverlayAnchors.right.guides);
 
     const drawFillPath = (
-      points: FaceLocalBrowControlPoints,
+      points: PreviewBrowControlPoints,
       mode: RecommendedEyebrowRenderMode,
     ) => {
       context.beginPath();
@@ -228,7 +269,7 @@ export const CameraPreview = ({
     });
 
     const drawCenterPath = (
-      points: FaceLocalBrowControlPoints,
+      points: PreviewBrowControlPoints,
       mode: RecommendedEyebrowRenderMode,
     ) => {
       context.beginPath();
@@ -248,43 +289,58 @@ export const CameraPreview = ({
       context.stroke();
     };
 
+    const drawGuideLines = (
+      anchors: Pick<PreviewBrowControlPoints, 'sp' | 'hp' | 'ep'>,
+      guideLines: PreviewGuideLines | null,
+    ) => {
+      context.beginPath();
+      if (guideLines) {
+        context.moveTo(guideLines.spLine.start.x, guideLines.spLine.start.y);
+        context.lineTo(guideLines.spLine.end.x, guideLines.spLine.end.y);
+        context.moveTo(guideLines.hpLine.start.x, guideLines.hpLine.start.y);
+        context.lineTo(guideLines.hpLine.end.x, guideLines.hpLine.end.y);
+        context.moveTo(guideLines.epLine.start.x, guideLines.epLine.start.y);
+        context.lineTo(guideLines.epLine.end.x, guideLines.epLine.end.y);
+      } else {
+        const topY = Math.min(anchors.sp.y, anchors.hp.y, anchors.ep.y) - 0.32;
+        const bottomY = Math.max(anchors.sp.y, anchors.hp.y, anchors.ep.y) + 1.18;
+        const lowerCenter = { x: 0, y: bottomY };
+
+        context.moveTo(anchors.sp.x, topY);
+        context.lineTo(anchors.sp.x, bottomY);
+        context.moveTo(anchors.hp.x, topY);
+        context.lineTo(anchors.hp.x, bottomY);
+        context.moveTo(lowerCenter.x, lowerCenter.y);
+        context.lineTo(anchors.ep.x, anchors.ep.y);
+      }
+      context.stroke();
+    };
+
     context.save();
     context.scale(pixelRatio, pixelRatio);
-    context.transform(
-      xAxis.x * faceScaleX,
-      xAxis.y * faceScaleY,
-      yAxis.x * faceScaleX,
-      yAxis.y * faceScaleY,
-      transformOrigin.x,
-      transformOrigin.y,
-    );
     context.lineCap = 'round';
     context.lineJoin = 'round';
     context.strokeStyle = 'rgba(79, 44, 29, 0.92)';
     context.fillStyle = 'rgba(79, 44, 29, 0.18)';
-    context.lineWidth = Math.max(2.4, recommendationGeometry.strokeWidth * 2.4) / averageFaceScale;
+    context.lineWidth = Math.max(2.4, recommendationGeometry.strokeWidth * 2.4);
     context.shadowColor = 'rgba(255, 255, 255, 0.75)';
-    context.shadowBlur = 6 / averageFaceScale;
+    context.shadowBlur = 6;
+
+    context.save();
+    context.strokeStyle = 'rgba(201, 169, 110, 0.72)';
+    context.lineWidth = 1.1;
+    context.shadowBlur = 0;
+    context.setLineDash?.([4, 3]);
+    drawGuideLines(leftGuideAnchors, leftGuideLines);
+    drawGuideLines(rightGuideAnchors, rightGuideLines);
+    context.restore();
 
     drawFillPath(left, recommendationGeometry.mode);
     drawFillPath(right, recommendationGeometry.mode);
     drawCenterPath(left, recommendationGeometry.mode);
     drawCenterPath(right, recommendationGeometry.mode);
     context.restore();
-
-    context.save();
-    context.scale(pixelRatio, pixelRatio);
-    const mappedLandmarks = mapLandmarksToPreviewPixels(landmarks, videoDimensions, previewDimensions)
-      .filter((point) => point.visible);
-    context.shadowBlur = 0;
-    context.fillStyle = 'rgba(79, 44, 29, 0.35)';
-    mappedLandmarks.forEach((point) => {
-      context.beginPath();
-      context.arc(point.x, point.y, 1.25, 0, Math.PI * 2);
-      context.fill();
-    });
-    context.restore();
-  }, [alignment.ready, cameraPermission, landmarks, liveOverlayAnchors, overlayRevision, selectedRecommendation, videoRef]);
+  }, [alignment.ready, cameraPermission, liveOverlayAnchors, overlayRevision, selectedRecommendation, videoRef]);
 
   return (
     <>

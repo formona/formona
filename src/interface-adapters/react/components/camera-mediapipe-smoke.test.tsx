@@ -28,21 +28,26 @@ const makeFaceMeshLandmarks = () => {
   const landmarks = Array.from({ length: 468 }, () => point(0, 0));
 
   Object.assign(landmarks, {
+    0: point(0.5, 0.62),
     10: point(0.5, 0.14),
+    13: point(0.5, 0.66),
     33: point(0.34, 0.43),
     55: point(0.42, 0.34),
     65: point(0.36, 0.31),
+    98: point(0.44, 0.57),
     103: point(0.3, 0.28),
     107: point(0.27, 0.36),
     133: point(0.42, 0.43),
     145: point(0.38, 0.45),
     152: point(0.5, 0.82),
     159: point(0.38, 0.41),
+    164: point(0.5, 0.6),
     172: point(0.36, 0.72),
     234: point(0.23, 0.52),
     263: point(0.66, 0.43),
     285: point(0.58, 0.34),
     295: point(0.64, 0.31),
+    327: point(0.56, 0.57),
     332: point(0.7, 0.28),
     336: point(0.73, 0.36),
     362: point(0.58, 0.43),
@@ -59,9 +64,11 @@ const originalReadyState = Object.getOwnPropertyDescriptor(HTMLMediaElement.prot
 const originalCurrentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
 const originalVideoWidth = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoWidth');
 const originalVideoHeight = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoHeight');
+let mockCurrentTime = 0;
 
 describe('real camera and MediaPipe initialization smoke flow', () => {
   beforeEach(() => {
+    mockCurrentTime = 0;
     mediaPipeMock.detectForVideo.mockReturnValue({
       faceLandmarks: [makeFaceMeshLandmarks()],
     });
@@ -84,7 +91,10 @@ describe('real camera and MediaPipe initialization smoke flow', () => {
     });
     Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
       configurable: true,
-      get: () => 1,
+      get: () => {
+        mockCurrentTime += 0.016;
+        return mockCurrentTime;
+      },
     });
     Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', {
       configurable: true,

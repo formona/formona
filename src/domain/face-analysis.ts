@@ -2,6 +2,8 @@ import {
   FaceShape,
   type ArEyebrowPath,
   type EyebrowMetrics,
+  type EyebrowGoldenRatioMeasurements,
+  type EyebrowGoldenRatioSideMeasurements,
   type EyebrowOverlayAnchors,
   type EyebrowMetricConfidence,
   type EyebrowMetricConfidenceModel,
@@ -67,6 +69,12 @@ const SQUARE_MIN_JAW_TO_CHEEK = 0.86;
 const SQUARE_MIN_FOREHEAD_TO_CHEEK = 0.86;
 const SQUARE_MAX_WIDTH_DELTA = 0.18;
 const CHEEK_IS_WIDEST_RATIO = 0.96;
+const OVAL_MIN_HEIGHT_TO_WIDTH = ROUND_MAX_HEIGHT_TO_WIDTH;
+const OVAL_MIN_FOREHEAD_TO_CHEEK = 0.7;
+const OVAL_MAX_FOREHEAD_TO_CHEEK = 1.02;
+const OVAL_MIN_JAW_TO_CHEEK = 0.5;
+const OVAL_MAX_JAW_TO_CHEEK = 0.85;
+const OVAL_MIN_CHEEK_TO_FACE_WIDTH = 0.96;
 export const EYEBROW_METRIC_CONFIDENCE_THRESHOLDS = {
   targetErrorMm: 3,
   eligibilityErrorMm: 5,
@@ -85,10 +93,10 @@ const EYEBROW_METRIC_BASE_ERROR_MM: Record<EyebrowMetricKey, number> = {
 };
 
 const EYEBROW_METRIC_SCALE_SENSITIVITY: Record<EyebrowMetricKey, number> = {
-  sp: 0.55,
-  hp: 0.65,
-  ep: 0.6,
-  totalLength: 1,
+  sp: 0.2,
+  hp: 0.35,
+  ep: 0.2,
+  totalLength: 0.85,
   thickness: 0.35,
   archHeight: 0.7,
   gap: 0.9,
@@ -172,7 +180,11 @@ const landmarkConfidence = (point: FacePoint | null) => {
   if (!point) return 0;
 
   const confidenceValues = [point.presence, point.visibility]
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    .filter((value): value is number => (
+      typeof value === 'number'
+      && Number.isFinite(value)
+      && value > 0
+    ));
 
   if (confidenceValues.length === 0) return 1;
 
@@ -764,14 +776,24 @@ const isRoundFaceGeometry = (geometry: NormalizedFaceGeometry) => (
     && geometry.cheekToFaceWidth >= CHEEK_IS_WIDEST_RATIO
 );
 
-export const classifyFaceShapeFromGeometry = (geometry: NormalizedFaceGeometry | null): FaceShape => {
-  if (!geometry) return FaceShape.OVAL;
+const isOvalFaceGeometry = (geometry: NormalizedFaceGeometry) => (
+  geometry.heightToWidth > OVAL_MIN_HEIGHT_TO_WIDTH
+    && geometry.cheekToFaceWidth >= OVAL_MIN_CHEEK_TO_FACE_WIDTH
+    && geometry.foreheadToCheek >= OVAL_MIN_FOREHEAD_TO_CHEEK
+    && geometry.foreheadToCheek <= OVAL_MAX_FOREHEAD_TO_CHEEK
+    && geometry.jawToCheek >= OVAL_MIN_JAW_TO_CHEEK
+    && geometry.jawToCheek <= OVAL_MAX_JAW_TO_CHEEK
+);
+
+export const classifyFaceShapeFromGeometry = (geometry: NormalizedFaceGeometry | null): FaceShape | null => {
+  if (!geometry) return null;
 
   if (isHeartFaceGeometry(geometry)) return FaceShape.HEART;
   if (isSquareFaceGeometry(geometry)) return FaceShape.SQUARE;
   if (isRoundFaceGeometry(geometry)) return FaceShape.ROUND;
+  if (isOvalFaceGeometry(geometry)) return FaceShape.OVAL;
 
-  return FaceShape.OVAL;
+  return null;
 };
 
 export const classifyFaceShape = (landmarks: FacePoint[]) => (
@@ -1030,6 +1052,118 @@ export const extractEyeGeometryMetrics = (
   };
 };
 
+const distanceToMm = (
+  a: FacePoint | null,
+  b: FacePoint | null,
+  dimensions: VideoDimensions,
+  pxToMmScale: number,
+) => normalizedDistanceToMm(scaledDistance(a, b, dimensions), pxToMmScale);
+
+const averageSideValue = (left: number, right: number) => (left + right) / 2;
+
+const projectPointRatioOnLine = (
+  point: FacePoint | null,
+  lineStart: FacePoint | null,
+  lineEnd: FacePoint | null,
+  dimensions: VideoDimensions,
+) => {
+  if (!point || !lineStart || !lineEnd) return 0;
+
+  const p = toPixelPoint(point, dimensions);
+  const a = toPixelPoint(lineStart, dimensions);
+  const b = toPixelPoint(lineEnd, dimensions);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = (dx * dx) + (dy * dy);
+  if (lengthSquared <= 0) return 0;
+
+  return (((p.x - a.x) * dx) + ((p.y - a.y) * dy)) / lengthSquared;
+};
+
+const buildSideGoldenRatioMeasurements = (
+  side: EyebrowOverlayAnchors['left'],
+  dimensions: VideoDimensions,
+  pxToMmScale: number,
+): EyebrowGoldenRatioSideMeasurements => {
+  const spToEpMm = distanceToMm(side.sp, side.ep, dimensions, pxToMmScale);
+  const hpPositionRatio = clamp(projectPointRatioOnLine(side.hp, side.sp, side.ep, dimensions), 0, 1);
+  const spToHpMm = spToEpMm * hpPositionRatio;
+  const hpToEpMm = spToEpMm - spToHpMm;
+  const actualGoldenRatio = hpToEpMm > 0 ? spToHpMm / hpToEpMm : 0;
+
+  return {
+    spLineMm: side.guides ? distanceToMm(side.guides.spLine.start, side.guides.spLine.end, dimensions, pxToMmScale) : 0,
+    hpLineMm: side.guides ? distanceToMm(side.guides.hpLine.start, side.guides.hpLine.end, dimensions, pxToMmScale) : 0,
+    epLineMm: side.guides ? distanceToMm(side.guides.epLine.start, side.guides.epLine.end, dimensions, pxToMmScale) : 0,
+    spToHpMm,
+    hpToEpMm,
+    spToEpMm,
+    hpHeightMm: perpendicularDistanceToLineMm(side.hp, side.sp, side.ep, dimensions, pxToMmScale),
+    hpPositionRatio,
+    actualGoldenRatio,
+  };
+};
+
+const averageGoldenRatioMeasurements = (
+  left: EyebrowGoldenRatioSideMeasurements,
+  right: EyebrowGoldenRatioSideMeasurements,
+): EyebrowGoldenRatioSideMeasurements => ({
+  spLineMm: averageSideValue(left.spLineMm, right.spLineMm),
+  hpLineMm: averageSideValue(left.hpLineMm, right.hpLineMm),
+  epLineMm: averageSideValue(left.epLineMm, right.epLineMm),
+  spToHpMm: averageSideValue(left.spToHpMm, right.spToHpMm),
+  hpToEpMm: averageSideValue(left.hpToEpMm, right.hpToEpMm),
+  spToEpMm: averageSideValue(left.spToEpMm, right.spToEpMm),
+  hpHeightMm: averageSideValue(left.hpHeightMm, right.hpHeightMm),
+  hpPositionRatio: averageSideValue(left.hpPositionRatio, right.hpPositionRatio),
+  actualGoldenRatio: averageSideValue(left.actualGoldenRatio, right.actualGoldenRatio),
+});
+
+const buildGoldenRatioMeasurements = (
+  overlayAnchors: EyebrowOverlayAnchors,
+  dimensions: VideoDimensions,
+  pxToMmScale: number,
+): EyebrowGoldenRatioMeasurements => {
+  const left = buildSideGoldenRatioMeasurements(overlayAnchors.left, dimensions, pxToMmScale);
+  const right = buildSideGoldenRatioMeasurements(overlayAnchors.right, dimensions, pxToMmScale);
+
+  return {
+    left,
+    right,
+    average: averageGoldenRatioMeasurements(left, right),
+  };
+};
+
+const buildEyebrowMetricsFromOverlayAnchors = ({
+  overlayAnchors,
+  dimensions,
+  pxToMmScale,
+  goldenRatioMeasurements,
+}: {
+  overlayAnchors: EyebrowOverlayAnchors;
+  dimensions: VideoDimensions;
+  pxToMmScale: number;
+  goldenRatioMeasurements: EyebrowGoldenRatioMeasurements;
+}): EyebrowMetrics => {
+  const leftLength = distanceToMm(overlayAnchors.left.sp, overlayAnchors.left.ep, dimensions, pxToMmScale);
+  const rightLength = distanceToMm(overlayAnchors.right.sp, overlayAnchors.right.ep, dimensions, pxToMmScale);
+  const totalLength = averageSideValue(leftLength, rightLength);
+  const archHeight = averageSideValue(
+    perpendicularDistanceToLineMm(overlayAnchors.left.hp, overlayAnchors.left.sp, overlayAnchors.left.ep, dimensions, pxToMmScale),
+    perpendicularDistanceToLineMm(overlayAnchors.right.hp, overlayAnchors.right.sp, overlayAnchors.right.ep, dimensions, pxToMmScale),
+  );
+
+  return {
+    sp: goldenRatioMeasurements.average.spLineMm,
+    hp: goldenRatioMeasurements.average.hpLineMm,
+    ep: goldenRatioMeasurements.average.epLineMm,
+    totalLength,
+    thickness: Math.max(3.5, Math.min(10, (totalLength * 0.12) + (archHeight * 0.18))),
+    archHeight,
+    gap: distanceToMm(overlayAnchors.left.sp, overlayAnchors.right.sp, dimensions, pxToMmScale),
+  };
+};
+
 const buildOverlay = (anchors: EyebrowOverlayAnchors): ArEyebrowPath => {
   const path = ({ sp, hp, ep }: EyebrowOverlayAnchors['left']) => {
     return `M ${(sp.x * 100).toFixed(2)} ${(sp.y * 100).toFixed(2)} Q ${(hp.x * 100).toFixed(2)} ${(hp.y * 100).toFixed(2)} ${(ep.x * 100).toFixed(2)} ${(ep.y * 100).toFixed(2)}`;
@@ -1160,6 +1294,8 @@ export const analyzeFaceLandmarks = (
   const faceCoordinateSpace = normalizeLandmarksToFaceSpace(landmarks);
 
   if (!pupilIpd || !faceDimensions || !normalizedGeometry || !proportionMetrics || !faceCoordinateSpace) return null;
+  const faceShape = classifyFaceShapeFromGeometry(normalizedGeometry);
+  if (!faceShape) return null;
 
   const alignment = buildFaceAlignment(landmarks);
   const ipdValidation = validatePupilIpdMeasurement(pupilIpd, alignment, dimensions);
@@ -1190,15 +1326,14 @@ export const analyzeFaceLandmarks = (
 
   const overlayAnchors = buildEyebrowOverlayAnchorPoints(landmarks);
   if (!overlayAnchors) return null;
+  const goldenRatioMeasurements = buildGoldenRatioMeasurements(overlayAnchors, dimensions, pxToMmScale);
 
-  const sp = (eyebrowPosition.left.startToPupil + eyebrowPosition.right.startToPupil) / 2;
-  const hp = (eyebrowPosition.left.archToPupil + eyebrowPosition.right.archToPupil) / 2;
-  const ep = (eyebrowPosition.left.endToPupil + eyebrowPosition.right.endToPupil) / 2;
-  const totalLength = (eyebrowPosition.left.length + eyebrowPosition.right.length) / 2;
-  const archHeight = eyebrowPosition.archHeight;
-  const gap = eyebrowPosition.browSpacing;
-  const thickness = Math.max(3.5, Math.min(10, (totalLength * 0.12) + (archHeight * 0.18)));
-  const metrics = { sp, hp, ep, totalLength, thickness, archHeight, gap };
+  const metrics = buildEyebrowMetricsFromOverlayAnchors({
+    overlayAnchors,
+    dimensions,
+    pxToMmScale,
+    goldenRatioMeasurements,
+  });
 
   if (!hasUsableMeasurementValues(metrics)) return null;
 
@@ -1218,7 +1353,7 @@ export const analyzeFaceLandmarks = (
   }));
 
   return {
-    faceShape: classifyFaceShapeFromGeometry(normalizedGeometry),
+    faceShape,
     faceDimensions,
     normalizedGeometry,
     proportionMetrics,
@@ -1233,6 +1368,8 @@ export const analyzeFaceLandmarks = (
     pxToMmScale,
     alignment,
     overlayAnchors,
+    goldenRatioMeasurements,
     overlay: buildOverlay(overlayAnchors),
+    videoDimensions: dimensions,
   };
 };
