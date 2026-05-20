@@ -196,31 +196,6 @@ export const CameraPreview = ({
     const right = mapControlPoints(recommendationGeometry.right);
     if (!left || !right) return;
 
-    const mapAnchorPoint = (point: FacePoint): FacePoint | null => toPreviewPoint(point);
-    const leftGuides = {
-      sp: mapAnchorPoint(liveOverlayAnchors.left.sp),
-      hp: mapAnchorPoint(liveOverlayAnchors.left.hp),
-      ep: mapAnchorPoint(liveOverlayAnchors.left.ep),
-    };
-    const rightGuides = {
-      sp: mapAnchorPoint(liveOverlayAnchors.right.sp),
-      hp: mapAnchorPoint(liveOverlayAnchors.right.hp),
-      ep: mapAnchorPoint(liveOverlayAnchors.right.ep),
-    };
-    if (!leftGuides.sp || !leftGuides.hp || !leftGuides.ep || !rightGuides.sp || !rightGuides.hp || !rightGuides.ep) {
-      return;
-    }
-    const leftGuideAnchors = {
-      sp: leftGuides.sp,
-      hp: leftGuides.hp,
-      ep: leftGuides.ep,
-    };
-    const rightGuideAnchors = {
-      sp: rightGuides.sp,
-      hp: rightGuides.hp,
-      ep: rightGuides.ep,
-    };
-
     const mapGuideLine = (line: EyebrowGoldenRatioSideGuides['spLine']): PreviewGuideLine | null => {
       const start = toPreviewPoint(line.start);
       const end = toPreviewPoint(line.end);
@@ -289,30 +264,49 @@ export const CameraPreview = ({
       context.stroke();
     };
 
-    const drawGuideLines = (
-      anchors: Pick<PreviewBrowControlPoints, 'sp' | 'hp' | 'ep'>,
-      guideLines: PreviewGuideLines | null,
-    ) => {
-      context.beginPath();
-      if (guideLines) {
-        context.moveTo(guideLines.spLine.start.x, guideLines.spLine.start.y);
-        context.lineTo(guideLines.spLine.end.x, guideLines.spLine.end.y);
-        context.moveTo(guideLines.hpLine.start.x, guideLines.hpLine.start.y);
-        context.lineTo(guideLines.hpLine.end.x, guideLines.hpLine.end.y);
-        context.moveTo(guideLines.epLine.start.x, guideLines.epLine.start.y);
-        context.lineTo(guideLines.epLine.end.x, guideLines.epLine.end.y);
-      } else {
-        const topY = Math.min(anchors.sp.y, anchors.hp.y, anchors.ep.y) - 0.32;
-        const bottomY = Math.max(anchors.sp.y, anchors.hp.y, anchors.ep.y) + 1.18;
-        const lowerCenter = { x: 0, y: bottomY };
+    const drawGuideLines = (guideLines: PreviewGuideLines | null) => {
+      if (!guideLines) return;
 
-        context.moveTo(anchors.sp.x, topY);
-        context.lineTo(anchors.sp.x, bottomY);
-        context.moveTo(anchors.hp.x, topY);
-        context.lineTo(anchors.hp.x, bottomY);
-        context.moveTo(lowerCenter.x, lowerCenter.y);
-        context.lineTo(anchors.ep.x, anchors.ep.y);
-      }
+      context.beginPath();
+      context.moveTo(guideLines.spLine.start.x, guideLines.spLine.start.y);
+      context.lineTo(guideLines.spLine.end.x, guideLines.spLine.end.y);
+      context.moveTo(guideLines.hpLine.start.x, guideLines.hpLine.start.y);
+      context.lineTo(guideLines.hpLine.end.x, guideLines.hpLine.end.y);
+      context.moveTo(guideLines.epLine.start.x, guideLines.epLine.start.y);
+      context.lineTo(guideLines.epLine.end.x, guideLines.epLine.end.y);
+      context.stroke();
+    };
+
+    const drawHorizontalGuideLines = (
+      leftLines: PreviewGuideLines | null,
+      rightLines: PreviewGuideLines | null,
+    ) => {
+      if (!leftLines || !rightLines) return;
+
+      const browY = (
+        leftLines.spLine.end.y
+        + leftLines.epLine.end.y
+        + rightLines.spLine.end.y
+        + rightLines.epLine.end.y
+      ) / 4;
+      const noseBottomY = (leftLines.spLine.start.y + rightLines.spLine.start.y) / 2;
+      const browXs = [
+        leftLines.epLine.end.x,
+        leftLines.spLine.end.x,
+        rightLines.spLine.end.x,
+        rightLines.epLine.end.x,
+      ];
+      const minX = Math.min(...browXs);
+      const maxX = Math.max(...browXs);
+      const extension = Math.max(24, (maxX - minX) * 0.22);
+      const startX = Math.max(0, minX - extension);
+      const endX = Math.min(previewDimensions.width, maxX + extension);
+
+      context.beginPath();
+      context.moveTo(startX, browY);
+      context.lineTo(endX, browY);
+      context.moveTo(startX, noseBottomY);
+      context.lineTo(endX, noseBottomY);
       context.stroke();
     };
 
@@ -331,8 +325,9 @@ export const CameraPreview = ({
     context.lineWidth = 1.1;
     context.shadowBlur = 0;
     context.setLineDash?.([4, 3]);
-    drawGuideLines(leftGuideAnchors, leftGuideLines);
-    drawGuideLines(rightGuideAnchors, rightGuideLines);
+    drawHorizontalGuideLines(leftGuideLines, rightGuideLines);
+    drawGuideLines(leftGuideLines);
+    drawGuideLines(rightGuideLines);
     context.restore();
 
     drawFillPath(left, recommendationGeometry.mode);

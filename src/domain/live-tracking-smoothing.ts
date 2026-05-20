@@ -1,4 +1,6 @@
 import type {
+  EyebrowGoldenRatioGuideLine,
+  EyebrowGoldenRatioSideGuides,
   EyebrowOverlayAnchorPoint,
   EyebrowOverlayAnchors,
   EyebrowOverlaySideAnchors,
@@ -81,16 +83,45 @@ const smoothAnchorPoint = (
   alpha: number,
 ): EyebrowOverlayAnchorPoint => smoothPoint(previous, next, alpha);
 
+const smoothGuideLine = (
+  previous: EyebrowGoldenRatioGuideLine,
+  next: EyebrowGoldenRatioGuideLine,
+  alpha: number,
+): EyebrowGoldenRatioGuideLine => ({
+  start: smoothAnchorPoint(previous.start, next.start, alpha),
+  end: smoothAnchorPoint(previous.end, next.end, alpha),
+});
+
+const smoothSideGuides = (
+  previous: EyebrowGoldenRatioSideGuides | undefined,
+  next: EyebrowGoldenRatioSideGuides | undefined,
+  alpha: number,
+): EyebrowGoldenRatioSideGuides | undefined => {
+  if (!previous || !next) return next ? cloneSideGuides(next) : undefined;
+
+  return {
+    spLine: smoothGuideLine(previous.spLine, next.spLine, alpha),
+    hpLine: smoothGuideLine(previous.hpLine, next.hpLine, alpha),
+    epLine: smoothGuideLine(previous.epLine, next.epLine, alpha),
+    goldenRatioTarget: smoothAnchorPoint(previous.goldenRatioTarget, next.goldenRatioTarget, alpha),
+  };
+};
+
 const smoothSideAnchors = (
   previous: EyebrowOverlaySideAnchors,
   next: EyebrowOverlaySideAnchors,
   alpha: number,
-): EyebrowOverlaySideAnchors => ({
-  sp: smoothAnchorPoint(previous.sp, next.sp, alpha),
-  hp: smoothAnchorPoint(previous.hp, next.hp, alpha),
-  ep: smoothAnchorPoint(previous.ep, next.ep, alpha),
-  confidence: Math.min(previous.confidence, next.confidence),
-});
+): EyebrowOverlaySideAnchors => {
+  const guides = smoothSideGuides(previous.guides, next.guides, alpha);
+
+  return {
+    sp: smoothAnchorPoint(previous.sp, next.sp, alpha),
+    hp: smoothAnchorPoint(previous.hp, next.hp, alpha),
+    ep: smoothAnchorPoint(previous.ep, next.ep, alpha),
+    confidence: Math.min(previous.confidence, next.confidence),
+    ...(guides ? { guides } : {}),
+  };
+};
 
 const smoothTransform = (
   previous: EyebrowOverlayTransform,
@@ -123,21 +154,33 @@ const smoothOverlayAnchors = (
   };
 };
 
+const cloneGuideLine = (line: EyebrowGoldenRatioGuideLine): EyebrowGoldenRatioGuideLine => ({
+  start: clonePoint(line.start),
+  end: clonePoint(line.end),
+});
+
+function cloneSideGuides(guides: EyebrowGoldenRatioSideGuides): EyebrowGoldenRatioSideGuides {
+  return {
+    spLine: cloneGuideLine(guides.spLine),
+    hpLine: cloneGuideLine(guides.hpLine),
+    epLine: cloneGuideLine(guides.epLine),
+    goldenRatioTarget: clonePoint(guides.goldenRatioTarget),
+  };
+}
+
+const cloneSideAnchors = (side: EyebrowOverlaySideAnchors): EyebrowOverlaySideAnchors => ({
+  sp: clonePoint(side.sp),
+  hp: clonePoint(side.hp),
+  ep: clonePoint(side.ep),
+  confidence: side.confidence,
+  ...(side.guides ? { guides: cloneSideGuides(side.guides) } : {}),
+});
+
 const cloneOverlayAnchors = (anchors: EyebrowOverlayAnchors | null) => (
   anchors
     ? {
-      left: {
-        sp: clonePoint(anchors.left.sp),
-        hp: clonePoint(anchors.left.hp),
-        ep: clonePoint(anchors.left.ep),
-        confidence: anchors.left.confidence,
-      },
-      right: {
-        sp: clonePoint(anchors.right.sp),
-        hp: clonePoint(anchors.right.hp),
-        ep: clonePoint(anchors.right.ep),
-        confidence: anchors.right.confidence,
-      },
+      left: cloneSideAnchors(anchors.left),
+      right: cloneSideAnchors(anchors.right),
       confidence: anchors.confidence,
       transform: {
         origin: clonePoint(anchors.transform.origin),
