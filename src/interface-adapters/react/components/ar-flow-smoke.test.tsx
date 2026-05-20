@@ -550,10 +550,12 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     });
     expect(canvasContextMock.arc).not.toHaveBeenCalled();
     expect(canvasContextMock.transform).not.toHaveBeenCalled();
-    expect(canvasContextMock.moveTo.mock.calls[2][0]).toBeCloseTo(195, 1);
-    expect(canvasContextMock.moveTo.mock.calls[2][1]).toBeCloseTo(430.9, 1);
-    expect(canvasContextMock.lineTo.mock.calls[2][0]).toBeCloseTo(109.2, 1);
-    expect(canvasContextMock.lineTo.mock.calls[2][1]).toBeCloseTo(216, 1);
+    expect(canvasContextMock.moveTo.mock.calls[0][1]).toBeCloseTo(216, 1);
+    expect(canvasContextMock.moveTo.mock.calls[1][1]).toBeCloseTo(368.5, 1);
+    expect(canvasContextMock.moveTo.mock.calls[4][0]).toBeCloseTo(195, 1);
+    expect(canvasContextMock.moveTo.mock.calls[4][1]).toBeCloseTo(430.9, 1);
+    expect(canvasContextMock.lineTo.mock.calls[4][0]).toBeCloseTo(109.2, 1);
+    expect(canvasContextMock.lineTo.mock.calls[4][1]).toBeCloseTo(216, 1);
 
     vi.mocked(canvasContextMock.clearRect).mockClear();
     vi.mocked(canvasContextMock.quadraticCurveTo).mockClear();

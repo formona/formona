@@ -14,12 +14,42 @@ const makeOverlayAnchors = (offset = 0): EyebrowOverlayAnchors => ({
     hp: { x: 0.42 + offset, y: 0.28, source: 'iris' },
     ep: { x: 0.48 + offset, y: 0.33 },
     confidence: 1,
+    guides: {
+      spLine: {
+        start: { x: 0.36 + offset, y: 0.52 },
+        end: { x: 0.36 + offset, y: 0.32 },
+      },
+      hpLine: {
+        start: { x: 0.42 + offset, y: 0.43, source: 'iris' },
+        end: { x: 0.42 + offset, y: 0.28, source: 'iris' },
+      },
+      epLine: {
+        start: { x: 0.5 + offset, y: 0.66 },
+        end: { x: 0.48 + offset, y: 0.33 },
+      },
+      goldenRatioTarget: { x: 0.44 + offset, y: 0.33 },
+    },
   },
   right: {
     sp: { x: 0.64 + offset, y: 0.32 },
     hp: { x: 0.58 + offset, y: 0.28, source: 'iris' },
     ep: { x: 0.52 + offset, y: 0.33 },
     confidence: 1,
+    guides: {
+      spLine: {
+        start: { x: 0.64 + offset, y: 0.52 },
+        end: { x: 0.64 + offset, y: 0.32 },
+      },
+      hpLine: {
+        start: { x: 0.58 + offset, y: 0.43, source: 'iris' },
+        end: { x: 0.58 + offset, y: 0.28, source: 'iris' },
+      },
+      epLine: {
+        start: { x: 0.5 + offset, y: 0.66 },
+        end: { x: 0.52 + offset, y: 0.33 },
+      },
+      goldenRatioTarget: { x: 0.56 + offset, y: 0.33 },
+    },
   },
   confidence: 1,
   transform: {
@@ -49,6 +79,9 @@ describe('createLiveFaceTrackingSmoother', () => {
     expect(second?.overlayAnchors?.left.sp.x).toBeCloseTo(0.364, 5);
     expect(second?.overlayAnchors?.transform.origin.x).toBeCloseTo(0.504, 5);
     expect(second?.overlayAnchors?.left.hp.source).toBe('iris');
+    expect(second?.overlayAnchors?.left.guides?.epLine.start.x).toBeCloseTo(0.504, 5);
+    expect(second?.overlayAnchors?.left.guides?.epLine.start.y).toBeCloseTo(0.66, 5);
+    expect(second?.overlayAnchors?.left.guides?.hpLine.start.source).toBe('iris');
   });
 
   it('uses fast interpolation for intentional head movement and resets on large jumps', () => {
