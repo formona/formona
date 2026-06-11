@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Download, LockKeyhole, LogOut, RefreshCw } from 'lucide-react';
 import {
-  MEASUREMENT_RECORD_STORAGE_KEY,
   parseMeasurementRecords,
   type StoredMeasurementRecord,
 } from '../../domain/measurement-records';
@@ -40,6 +39,14 @@ const downloadTextFile = (filename: string, data: string, type: string) => {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+};
+
+const ADMIN_PASSCODE_HEADER = 'x-formona-admin-passcode';
+
+const parseRecordsResponse = (value: unknown) => {
+  if (!value || typeof value !== 'object' || !('records' in value)) return [];
+
+  return parseMeasurementRecords(JSON.stringify((value as { records: unknown }).records));
 };
 
 const buildRecordsCsv = (records: StoredMeasurementRecord[]) => {
@@ -86,11 +93,12 @@ export default function AdminPage() {
   const [authStatus, setAuthStatus] = useState<'checking' | 'locked' | 'unlocked'>('checking');
   const [passcode, setPasscode] = useState('');
   const [authError, setAuthError] = useState('');
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
   const [records, setRecords] = useState<StoredMeasurementRecord[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
-  const refreshRecords = useCallback(() => {
-    const nextRecords = parseMeasurementRecords(localStorage.getItem(MEASUREMENT_RECORD_STORAGE_KEY));
+  const applyRecords = useCallback((nextRecords: StoredMeasurementRecord[]) => {
     setRecords(nextRecords);
     setSelectedRecordId((currentId) => (
       currentId && nextRecords.some((record) => record.id === currentId)
@@ -99,19 +107,80 @@ export default function AdminPage() {
     ));
   }, []);
 
-  useEffect(() => {
-    setAuthStatus(
-      sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey) === ADMIN_DEMO_AUTH_CONFIG.unlockedValue
-        ? 'unlocked'
-        : 'locked',
-    );
-  }, []);
+  const loadRecords = useCallback(async (adminPasscode: string, persistPasscode = false) => {
+    const nextPasscode = adminPasscode.trim();
+
+    if (!nextPasscode) {
+      setAuthStatus('locked');
+      setAuthError('비밀번호를 입력해주세요.');
+      return false;
+    }
+
+    setRecordsLoading(true);
+    setRecordsError(null);
+
+    try {
+      const response = await fetch('/api/admin/measurements', {
+        method: 'GET',
+        headers: {
+          [ADMIN_PASSCODE_HEADER]: nextPasscode,
+        },
+        cache: 'no-store',
+      });
+
+      if (response.status === 401) {
+        sessionStorage.removeItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey);
+        applyRecords([]);
+        setAuthStatus('locked');
+        setAuthError('비밀번호가 올바르지 않습니다.');
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Admin measurements request failed: ${response.status}`);
+      }
+
+      const nextRecords = parseRecordsResponse(await response.json());
+
+      if (persistPasscode) {
+        sessionStorage.setItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey, nextPasscode);
+      }
+
+      setPasscode('');
+      setAuthError('');
+      setAuthStatus('unlocked');
+      applyRecords(nextRecords);
+      return true;
+    } catch {
+      setRecordsError('측정 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setAuthStatus((currentStatus) => (currentStatus === 'checking' ? 'locked' : currentStatus));
+      return false;
+    } finally {
+      setRecordsLoading(false);
+    }
+  }, [applyRecords]);
+
+  const refreshRecords = useCallback(() => {
+    const storedPasscode = sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey);
+
+    if (!storedPasscode) {
+      setAuthStatus('locked');
+      return;
+    }
+
+    void loadRecords(storedPasscode);
+  }, [loadRecords]);
 
   useEffect(() => {
-    if (authStatus === 'unlocked') {
-      refreshRecords();
+    const storedPasscode = sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey);
+
+    if (!storedPasscode) {
+      setAuthStatus('locked');
+      return;
     }
-  }, [authStatus, refreshRecords]);
+
+    void loadRecords(storedPasscode);
+  }, [loadRecords]);
 
   const selectedRecord = useMemo(() => (
     records.find((record) => record.id === selectedRecordId) ?? records[0] ?? null
@@ -138,15 +207,7 @@ export default function AdminPage() {
   const handleUnlock = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (passcode.trim() !== ADMIN_DEMO_AUTH_CONFIG.passcode) {
-      setAuthError('비밀번호가 올바르지 않습니다.');
-      return;
-    }
-
-    sessionStorage.setItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey, ADMIN_DEMO_AUTH_CONFIG.unlockedValue);
-    setAuthError('');
-    setPasscode('');
-    setAuthStatus('unlocked');
+    void loadRecords(passcode, true);
   };
 
   const handleLogout = () => {
@@ -186,7 +247,7 @@ export default function AdminPage() {
               if (authError) setAuthError('');
             }}
             autoComplete="current-password"
-            disabled={authStatus === 'checking'}
+            disabled={authStatus === 'checking' || recordsLoading}
             aria-invalid={authError ? 'true' : 'false'}
             aria-describedby={authError ? 'admin-passcode-error' : undefined}
             className="mt-2 h-12 w-full rounded-lg border border-main-brown/20 bg-white px-3 text-base font-bold text-main-brown outline-none transition focus:border-main-brown"
@@ -198,10 +259,10 @@ export default function AdminPage() {
           )}
           <button
             type="submit"
-            disabled={authStatus === 'checking'}
+            disabled={authStatus === 'checking' || recordsLoading}
             className="btn btn-primary mt-5 h-12 w-full rounded-lg text-sm"
           >
-            {authStatus === 'checking' ? '확인 중' : '접속'}
+            {authStatus === 'checking' || recordsLoading ? '확인 중' : '접속'}
           </button>
         </form>
       </main>
@@ -220,9 +281,9 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={refreshRecords} className="btn btn-subtle min-h-11 rounded-lg px-4 text-[13px]">
-              <RefreshCw size={15} aria-hidden="true" />
-              새로고침
+            <button type="button" onClick={refreshRecords} disabled={recordsLoading} className="btn btn-subtle min-h-11 rounded-lg px-4 text-[13px]">
+              <RefreshCw size={15} className={recordsLoading ? 'animate-spin' : undefined} aria-hidden="true" />
+              {recordsLoading ? '불러오는 중' : '새로고침'}
             </button>
             <button type="button" onClick={handleDownloadCsv} disabled={records.length === 0} className="btn btn-secondary min-h-11 rounded-lg px-4 text-[13px]">
               <Download size={15} aria-hidden="true" />
@@ -238,6 +299,12 @@ export default function AdminPage() {
             </button>
           </div>
         </header>
+
+        {recordsError && (
+          <section className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {recordsError}
+          </section>
+        )}
 
         <section className="grid gap-3 sm:grid-cols-3" aria-label="측정 기록 요약">
           <div className="rounded-lg border border-main-brown/10 bg-main-brown/[0.03] p-4">
@@ -258,7 +325,7 @@ export default function AdminPage() {
           <section className="rounded-lg border border-main-brown/10 bg-white p-8 text-center">
             <h2 className="text-lg font-bold">저장된 측정 기록이 없습니다</h2>
             <p className="mt-2 text-sm leading-relaxed text-sub-gray">
-              앱에서 얼굴 분석을 완료하면 이 브라우저의 관리자 화면에 측정값이 누적됩니다.
+              앱에서 얼굴 분석을 완료하면 DB에 저장된 측정값이 이 관리자 화면에 표시됩니다.
             </p>
           </section>
         ) : (

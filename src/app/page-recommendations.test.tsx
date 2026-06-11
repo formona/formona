@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HomePage from './page';
 import { APP_TIMING_MS, FACE_SHAPE_RESULT_COPY } from '../constants';
-import { MEASUREMENT_RECORD_STORAGE_KEY, parseMeasurementRecords } from '../domain/measurement-records';
 import {
   FaceShape,
   type EyebrowOverlayAnchors,
@@ -249,6 +248,7 @@ describe('HomePage recommendation routing', () => {
     localStorage.clear();
     analysisMock.current = makeAnalysis(FaceShape.HEART);
     capturePageMock.props = [];
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ record: null }), { status: 201 })));
   });
 
   afterEach(() => {
@@ -270,9 +270,15 @@ describe('HomePage recommendation routing', () => {
     expect(screen.getAllByText('직선 수평형').length).toBeGreaterThan(0);
     expect(screen.queryByText('자연 아치형')).not.toBeInTheDocument();
 
-    const records = parseMeasurementRecords(localStorage.getItem(MEASUREMENT_RECORD_STORAGE_KEY));
-    expect(records).toHaveLength(1);
-    expect(records[0]?.payload).toMatchObject({
+    expect(fetch).toHaveBeenCalledWith('/api/measurements', expect.objectContaining({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    const [, requestInit] = vi.mocked(fetch).mock.calls[0] ?? [];
+    const payload = JSON.parse(String(requestInit?.body));
+    expect(payload).toMatchObject({
       faceShape: FaceShape.HEART,
       selectedStyle: { name: '직선 수평형' },
     });

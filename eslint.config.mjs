@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 const eslintConfig = [
   ...nextVitals,
   {
-    ignores: ["dist/**", "coverage/**", ".next/**", ".npm-cache/**", "monabrow/**"],
+    ignores: ["dist/**", "coverage/**", ".next/**", ".npm-cache/**", "monabrow/**", "src/generated/**"],
   },
   {
     rules: {

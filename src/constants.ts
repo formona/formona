@@ -39,9 +39,8 @@ export const FEATURE_FLAGS = {
 } as const;
 
 export const ADMIN_DEMO_AUTH_CONFIG = {
-  passcode: process.env.NEXT_PUBLIC_FORMONA_ADMIN_PASSCODE ?? 'formona-demo',
-  sessionStorageKey: 'formona_admin_demo_unlocked',
-  unlockedValue: 'true',
+  defaultPasscode: 'formona-demo',
+  sessionStorageKey: 'formona_admin_demo_passcode',
 } as const;
 
 export const FRONT_CAMERA_CONSTRAINTS: MediaStreamConstraints = {
