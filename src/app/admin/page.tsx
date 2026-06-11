@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Download, LockKeyhole, LogOut, RefreshCw } from 'lucide-react';
 import {
   MEASUREMENT_RECORD_STORAGE_KEY,
   parseMeasurementRecords,
   type StoredMeasurementRecord,
 } from '../../domain/measurement-records';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../domain/measurement-copy';
+import { ADMIN_DEMO_AUTH_CONFIG } from '../../constants';
 
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
@@ -82,6 +83,9 @@ const buildRecordsCsv = (records: StoredMeasurementRecord[]) => {
 };
 
 export default function AdminPage() {
+  const [authStatus, setAuthStatus] = useState<'checking' | 'locked' | 'unlocked'>('checking');
+  const [passcode, setPasscode] = useState('');
+  const [authError, setAuthError] = useState('');
   const [records, setRecords] = useState<StoredMeasurementRecord[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
@@ -96,8 +100,18 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    refreshRecords();
-  }, [refreshRecords]);
+    setAuthStatus(
+      sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey) === ADMIN_DEMO_AUTH_CONFIG.unlockedValue
+        ? 'unlocked'
+        : 'locked',
+    );
+  }, []);
+
+  useEffect(() => {
+    if (authStatus === 'unlocked') {
+      refreshRecords();
+    }
+  }, [authStatus, refreshRecords]);
 
   const selectedRecord = useMemo(() => (
     records.find((record) => record.id === selectedRecordId) ?? records[0] ?? null
@@ -120,6 +134,79 @@ export default function AdminPage() {
       'text/csv;charset=utf-8',
     );
   };
+
+  const handleUnlock = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (passcode.trim() !== ADMIN_DEMO_AUTH_CONFIG.passcode) {
+      setAuthError('비밀번호가 올바르지 않습니다.');
+      return;
+    }
+
+    sessionStorage.setItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey, ADMIN_DEMO_AUTH_CONFIG.unlockedValue);
+    setAuthError('');
+    setPasscode('');
+    setAuthStatus('unlocked');
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey);
+    setRecords([]);
+    setSelectedRecordId(null);
+    setPasscode('');
+    setAuthError('');
+    setAuthStatus('locked');
+  };
+
+  if (authStatus !== 'unlocked') {
+    return (
+      <main className="flex h-screen items-center justify-center overflow-y-auto bg-white px-4 py-6 text-main-brown sm:px-6">
+        <form
+          onSubmit={handleUnlock}
+          className="w-full max-w-sm rounded-lg border border-main-brown/10 bg-white p-6 shadow-sm"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-main-brown/[0.06] text-main-brown">
+            <LockKeyhole size={21} aria-hidden="true" />
+          </div>
+          <p className="mt-5 text-[11px] font-bold text-main-brown/55">FORMONA ADMIN</p>
+          <h1 className="mt-2 text-2xl font-bold leading-tight">관리자 접근</h1>
+          <p className="mt-2 text-sm leading-relaxed text-sub-gray">
+            측정 수치 확인을 위해 데모 관리자 비밀번호를 입력해주세요.
+          </p>
+
+          <label htmlFor="admin-passcode" className="mt-6 block text-xs font-bold text-sub-gray">
+            비밀번호
+          </label>
+          <input
+            id="admin-passcode"
+            type="password"
+            value={passcode}
+            onChange={(event) => {
+              setPasscode(event.target.value);
+              if (authError) setAuthError('');
+            }}
+            autoComplete="current-password"
+            disabled={authStatus === 'checking'}
+            aria-invalid={authError ? 'true' : 'false'}
+            aria-describedby={authError ? 'admin-passcode-error' : undefined}
+            className="mt-2 h-12 w-full rounded-lg border border-main-brown/20 bg-white px-3 text-base font-bold text-main-brown outline-none transition focus:border-main-brown"
+          />
+          {authError && (
+            <p id="admin-passcode-error" className="mt-2 text-xs font-bold text-red-600">
+              {authError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={authStatus === 'checking'}
+            className="btn btn-primary mt-5 h-12 w-full rounded-lg text-sm"
+          >
+            {authStatus === 'checking' ? '확인 중' : '접속'}
+          </button>
+        </form>
+      </main>
+    );
+  }
 
   return (
     <main className="h-screen overflow-y-auto bg-white px-4 py-6 text-main-brown sm:px-6 lg:px-10">
@@ -144,6 +231,10 @@ export default function AdminPage() {
             <button type="button" onClick={handleDownloadJson} disabled={records.length === 0} className="btn btn-primary min-h-11 rounded-lg px-4 text-[13px]">
               <Download size={15} aria-hidden="true" />
               JSON
+            </button>
+            <button type="button" onClick={handleLogout} className="btn btn-subtle min-h-11 rounded-lg px-4 text-[13px]">
+              <LogOut size={15} aria-hidden="true" />
+              로그아웃
             </button>
           </div>
         </header>

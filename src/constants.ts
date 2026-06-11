@@ -38,6 +38,12 @@ export const FEATURE_FLAGS = {
   arEyebrowOverlayEnabled: false,
 } as const;
 
+export const ADMIN_DEMO_AUTH_CONFIG = {
+  passcode: process.env.NEXT_PUBLIC_FORMONA_ADMIN_PASSCODE ?? 'formona-demo',
+  sessionStorageKey: 'formona_admin_demo_unlocked',
+  unlockedValue: 'true',
+} as const;
+
 export const FRONT_CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
   video: {
