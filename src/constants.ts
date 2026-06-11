@@ -31,6 +31,11 @@ export const IPD_CONFIG = {
 
 export const APP_TIMING_MS = {
   splash: 1500,
+  analysisTransition: 1600,
+} as const;
+
+export const FEATURE_FLAGS = {
+  arEyebrowOverlayEnabled: false,
 } as const;
 
 export const FRONT_CAMERA_CONSTRAINTS: MediaStreamConstraints = {
@@ -73,7 +78,7 @@ export const CAMERA_PERMISSION_COPY: Record<Exclude<CameraPermissionState, 'gran
 }> = {
   idle: {
     title: '전면 카메라 권한이 필요합니다',
-    description: '얼굴 정렬과 눈썹 AR 미리보기를 위해 모바일 브라우저 카메라를 실행합니다.',
+    description: '얼굴 정렬과 눈썹 측정을 위해 모바일 브라우저 카메라를 실행합니다.',
     actionLabel: '카메라 허용',
   },
   pending: {
@@ -116,20 +121,24 @@ export const FACE_SHAPE_RESULT_COPY: Record<FaceShape, FaceShapeResultCopy> = {
     title: '전체적으로 균형 잡힌 계란형 얼굴이에요',
     description: '어떤 스타일도 잘 어울리는 가장 이상적인 페이스 라인을 가지셨네요.',
     insight: '부드러운 곡선을 더하면 자연스러운 매력이 극대화됩니다.',
+    recommendationExplanation: '계란형 얼굴은 세로와 가로 비율이 안정적이고 턱선이 부드러워 여러 눈썹 형태를 무리 없이 소화합니다. 과하게 각을 세우기보다 자연 아치형처럼 완만한 곡선을 적용하면 기존 균형을 유지하면서 눈매가 또렷해지고, 전체 인상이 한층 정돈되어 보입니다.',
   },
   [FaceShape.SQUARE]: {
     title: '세련되고 각진 얼굴형에 가까워요',
     description: '매력적이고 뚜렷한 골격 구조가 강조되는 고급스러운 인상입니다.',
     insight: '아치형 디자인으로 각진 부분을 감싸면 더욱 부드러운 이미지가 완성됩니다.',
+    recommendationExplanation: '각형 얼굴은 턱선과 외곽선이 선명해 또렷하고 도시적인 인상을 줍니다. 부드러운 아치형 눈썹은 얼굴의 직선적인 골격과 대비되어 강한 인상을 완화하고, 눈썹 산의 완만한 곡선이 시선을 위쪽으로 분산해 얼굴 전체를 더 부드럽고 세련되게 보이게 합니다.',
   },
   [FaceShape.ROUND]: {
     title: '부드럽고 친숙한 둥근 얼굴형을 가지셨네요',
     description: '어려 보이는 동안 외모와 상냥한 분위기가 돋보이는 형태입니다.',
     insight: '각진 아치 스타일로 얼굴에 입체감을 더하면 더욱 또렷하고 성숙한 분위기를 연출할 수 있습니다.',
+    recommendationExplanation: '둥근 얼굴형은 가로와 세로의 비율이 비슷하고 턱선이 부드러워 전체적으로 완만하고 통통해 보일 수 있습니다. 높은 산을 살린 각진 아치형 눈썹을 적용하면 눈썹 산의 정점이 시선을 수직 방향으로 확장시켜 얼굴이 한결 길고 슬림해 보이는 착시를 만듭니다. 또한 날카로운 눈썹선이 둥근 외곽선과 대비되어 이목구비를 더 또렷하고 세련되게 보여줍니다.',
   },
   [FaceShape.HEART]: {
     title: '브이라인이 돋보이는 하트형 얼굴이에요',
     description: '이마가 넓고 턱선이 갸름하여 세련되고 도회적인 이미지가 강합니다.',
     insight: '평행한 직선 스타일로 상하 균형을 맞춰주면 차분한 인상을 줄 수 있습니다.',
+    recommendationExplanation: '하트형 얼굴은 이마와 광대 쪽에 시선이 모이고 턱선이 갸름하게 내려가는 특징이 있습니다. 직선 수평형 또는 낮은 아치형 눈썹은 위쪽으로 몰린 비중을 안정적으로 눌러주고, 얼굴 상하 균형을 맞춰 차분하면서도 정돈된 이미지를 만들어 줍니다.',
   },
 };

@@ -20,6 +20,13 @@ import { CapturePage } from '../interface-adapters/react/components/CapturePage'
 import { RecommendationResults } from '../interface-adapters/react/components/RecommendationResults';
 import { ResultPage } from '../interface-adapters/react/components/ResultPage';
 import { parseValidIpd, resolveIpdFallback, type IpdFallbackSource } from '../usecases/ipd';
+import { buildMeasurementDataPayload } from '../domain/measurement-payload';
+import {
+  addMeasurementRecord,
+  MEASUREMENT_RECORD_STORAGE_KEY,
+  parseMeasurementRecords,
+  serializeMeasurementRecords,
+} from '../domain/measurement-records';
 
 const getIpdFallbackNotice = (source: IpdFallbackSource, value: number) => {
   if (source === 'last-valid') {
@@ -74,12 +81,29 @@ export default function HomePage() {
 
   const handleAnalysisComplete = (imageDataUrl: string, analysis: FaceAnalysisResult) => {
     const nextRecommendationState = buildEyebrowRecommendationState(analysis);
+    const nextSelectedStyle = nextRecommendationState.status === 'ready' ? nextRecommendationState.recommendations[0] : null;
 
     setCapturedImage(imageDataUrl);
     setFaceAnalysis(analysis);
     setRecommendationContext(nextRecommendationState.context);
-    setSelectedStyle(nextRecommendationState.status === 'ready' ? nextRecommendationState.recommendations[0] : null);
+    setSelectedStyle(nextSelectedStyle);
     setAutoStartCapture(false);
+    if (nextRecommendationState.status === 'ready') {
+      try {
+        const rawRecords = localStorage.getItem(MEASUREMENT_RECORD_STORAGE_KEY);
+        const records = parseMeasurementRecords(rawRecords);
+        const payload = buildMeasurementDataPayload({ analysis, selectedStyle: nextSelectedStyle });
+        localStorage.setItem(
+          MEASUREMENT_RECORD_STORAGE_KEY,
+          serializeMeasurementRecords(addMeasurementRecord(records, payload)),
+        );
+      } catch {
+        // Result rendering should not depend on local admin storage availability.
+      }
+      setCurrentPage(Page.RESULT);
+      return;
+    }
+
     setCurrentPage(Page.RECOMMENDATIONS);
   };
 
@@ -108,7 +132,8 @@ export default function HomePage() {
         setCurrentPage(Page.CAPTURE);
         break;
       case Page.RESULT:
-        setCurrentPage(Page.RECOMMENDATIONS);
+        setAutoStartCapture(true);
+        setCurrentPage(Page.CAPTURE);
         break;
       default:
         break;

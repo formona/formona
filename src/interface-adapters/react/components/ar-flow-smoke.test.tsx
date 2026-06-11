@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CapturePage } from './CapturePage';
 import { RecommendationResults } from './RecommendationResults';
 import { ResultPage } from './ResultPage';
-import { FACE_SHAPE_RESULT_COPY } from '../../../constants';
+import { APP_TIMING_MS, FACE_SHAPE_RESULT_COPY } from '../../../constants';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../../domain/measurement-copy';
 import { buildEyebrowRecommendationContext, getEyebrowRecommendations } from '../../../usecases/eyebrow-recommendations';
 import {
@@ -460,7 +460,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByText('AI 스타일 정밀 분석')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(450);
+      vi.advanceTimersByTime(APP_TIMING_MS.analysisTransition);
     });
 
     expect(onAnalysisComplete).toHaveBeenCalledWith('data:image/jpeg;base64,monabrow', analysis);
@@ -504,7 +504,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     });
   });
 
-  it('draws the live recommendation overlay in preview pixel coordinates and clears it when the face is invalid', async () => {
+  it('keeps the live eyebrow overlay locked even when recommendation anchors are ready', async () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       width: 390,
       height: 640,
@@ -544,18 +544,13 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
 
     await waitFor(() => {
       expect(canvasContextMock.clearRect).toHaveBeenCalled();
-      expect(canvasContextMock.quadraticCurveTo).toHaveBeenCalled();
-      expect(canvasContextMock.stroke).toHaveBeenCalled();
-      expect(canvasContextMock.moveTo).toHaveBeenCalled();
     });
+    expect(overlayCanvas).toHaveClass('opacity-0');
     expect(canvasContextMock.arc).not.toHaveBeenCalled();
     expect(canvasContextMock.transform).not.toHaveBeenCalled();
-    expect(canvasContextMock.moveTo.mock.calls[0][1]).toBeCloseTo(216, 1);
-    expect(canvasContextMock.moveTo.mock.calls[1][1]).toBeCloseTo(368.5, 1);
-    expect(canvasContextMock.moveTo.mock.calls[4][0]).toBeCloseTo(195, 1);
-    expect(canvasContextMock.moveTo.mock.calls[4][1]).toBeCloseTo(430.9, 1);
-    expect(canvasContextMock.lineTo.mock.calls[4][0]).toBeCloseTo(109.2, 1);
-    expect(canvasContextMock.lineTo.mock.calls[4][1]).toBeCloseTo(216, 1);
+    expect(canvasContextMock.quadraticCurveTo).not.toHaveBeenCalled();
+    expect(canvasContextMock.stroke).not.toHaveBeenCalled();
+    expect(canvasContextMock.moveTo).not.toHaveBeenCalled();
 
     vi.mocked(canvasContextMock.clearRect).mockClear();
     vi.mocked(canvasContextMock.quadraticCurveTo).mockClear();
@@ -648,7 +643,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(trackerMock.stopCameraStream).toHaveBeenCalledOnce();
 
     act(() => {
-      vi.advanceTimersByTime(450);
+      vi.advanceTimersByTime(APP_TIMING_MS.analysisTransition);
     });
 
     expect(onAnalysisComplete).toHaveBeenCalledWith('data:image/jpeg;base64,monabrow', lowReportabilityAnalysis);
@@ -703,7 +698,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    expect(screen.getByText('AR 캡처 대기: 얼굴 미감지')).toBeInTheDocument();
+    expect(screen.getByText('얼굴 분석 대기: 얼굴 미감지')).toBeInTheDocument();
     expect(screen.getByText('얼굴을 찾고 있어요')).toBeInTheDocument();
     expect(screen.getAllByText('얼굴 전체가 타원 안에 보이도록 휴대폰을 정면에 맞춰주세요.')).toHaveLength(2);
     expect(screen.getByText('정렬 중')).toBeInTheDocument();
@@ -731,7 +726,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    expect(screen.getByText('AR 캡처 대기: 기준점 신뢰도 낮음')).toBeInTheDocument();
+    expect(screen.getByText('얼굴 분석 대기: 기준점 신뢰도 낮음')).toBeInTheDocument();
     expect(screen.getByText('동공 기준점이 불안정해요')).toBeInTheDocument();
     expect(screen.getAllByText('밝은 곳에서 얼굴을 고정하고 눈을 또렷하게 뜬 상태로 잠시 유지해주세요.')).toHaveLength(2);
     expect(screen.getAllByText('밝은 조명에서 정면을 보고 1초 정도 움직임을 멈춰주세요.')).toHaveLength(2);
@@ -781,7 +776,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    expect(screen.getByText('AR 캡처 대기: 기준점 누락')).toBeInTheDocument();
+    expect(screen.getByText('얼굴 분석 대기: 기준점 누락')).toBeInTheDocument();
     expect(screen.getByText('눈썹 기준점을 찾고 있어요')).toBeInTheDocument();
     expect(screen.getAllByText('앞머리, 손, 안경테가 눈썹을 가리지 않게 하고 양쪽 눈썹이 화면 안에 들어오도록 맞춰주세요.')).toHaveLength(2);
     expect(screen.getAllByText('앞머리, 손, 안경테를 치우고 양쪽 눈썹과 눈이 모두 보이게 맞춰주세요.')).toHaveLength(2);
@@ -789,7 +784,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getByRole('button', { name: '기준점 확인 중' })).toBeDisabled();
   });
 
-  it('renders the recommendation-ready state and selects an AR preview style', () => {
+  it('renders the recommendation-ready state and selects a result style', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.ROUND);
     const analysis = { ...makeAnalysis(), faceShape: FaceShape.ROUND };
     const recommendationContext = buildEyebrowRecommendationContext(analysis);
@@ -821,7 +816,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.getAllByText('각진 아치형').length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('button', { name: '상승형 선택' }));
-    fireEvent.click(screen.getByRole('button', { name: 'AR 미리보기' }));
+    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
 
     expect(onSelectRecommendation).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'upward' }),
@@ -841,68 +836,34 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     );
   });
 
-  it('displays detected, loading, and unknown face-shape states in the AR recommendation UI', () => {
+  it('displays the detected face-shape explanation in the result UI', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
     const selectedStyle = recommendations[0]!;
     const analysis = makeAnalysis();
-    const resultProps = {
-      capturedImage: 'data:image/jpeg;base64,monabrow',
-      selectedStyle,
-      onSelectedStyleChange: vi.fn(),
-      onRetry: vi.fn(),
-      onApplyStyle: vi.fn(),
-    };
 
-    const { rerender } = render(
+    render(
       <ResultPage
-        {...resultProps}
         faceShape={FaceShape.OVAL}
+        capturedImage="data:image/jpeg;base64,monabrow"
         analysis={analysis}
         recommendationContext={buildEyebrowRecommendationContext(analysis)}
+        selectedStyle={selectedStyle}
+        onSelectedStyleChange={vi.fn()}
+        onRetry={vi.fn()}
+        onApplyStyle={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('Detected face shape')).toBeInTheDocument();
-    expect(screen.getByText(FaceShape.OVAL)).toBeInTheDocument();
-
-    rerender(
-      <ResultPage
-        {...resultProps}
-        faceShape={null}
-        analysis={null}
-        recommendationContext={null}
-      />,
-    );
-
-    expect(screen.getByText('얼굴형 분석 중')).toBeInTheDocument();
-    expect(screen.getByText('Face shape loading')).toBeInTheDocument();
-
-    rerender(
-      <ResultPage
-        {...resultProps}
-        faceShape={null}
-        analysis={analysis}
-        recommendationContext={buildEyebrowRecommendationContext(analysis)}
-      />,
-    );
-
-    expect(screen.getByText('Detected face shape')).toBeInTheDocument();
-    expect(screen.getByText(analysis.faceShape)).toBeInTheDocument();
+    expect(screen.getByText('분석 결과')).toBeInTheDocument();
+    expect(screen.getAllByText(FaceShape.OVAL).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: FACE_SHAPE_RESULT_COPY[FaceShape.OVAL].title })).toBeInTheDocument();
+    expect(screen.getByText(FACE_SHAPE_RESULT_COPY[FaceShape.OVAL].recommendationExplanation)).toBeInTheDocument();
   });
 
-  it('renders the AR recommendation preview from the live camera instead of the captured photo', () => {
+  it('renders the captured result image without live AR preview', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
     const selectedStyle = recommendations[0]!;
     const analysis = makeAnalysis();
-    trackerMock.state = {
-      ...trackerMock.state,
-      cameraPermission: 'granted',
-      trackerStatus: 'ready',
-      alignment: readyAlignment,
-      detectedFaceShape: FaceShape.OVAL,
-      analysis,
-      liveOverlayAnchors: mockOverlayAnchors,
-    };
 
     const { container } = render(
       <ResultPage
@@ -917,14 +878,13 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
       />,
     );
 
-    expect(screen.queryByAltText('분석 촬영 이미지')).not.toBeInTheDocument();
-    expect(container.querySelector('video')).toBeInTheDocument();
-    expect(screen.getByTestId('camera-ar-overlay')).toBeInTheDocument();
-    expect(screen.getByText('LIVE AR')).toBeInTheDocument();
-    expect(screen.getByText(`${selectedStyle.name} 실시간 트레이싱 중`)).toBeInTheDocument();
+    expect(screen.getByAltText('분석 촬영 이미지')).toBeInTheDocument();
+    expect(container.querySelector('video')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('camera-ar-overlay')).not.toBeInTheDocument();
+    expect(screen.queryByText('LIVE AR')).not.toBeInTheDocument();
   });
 
-  it('displays all seven eyebrow metrics in the AR recommendation UI', () => {
+  it('displays all seven eyebrow metrics in the result UI', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
     const selectedStyle = recommendations[0]!;
     const analysis = makeAnalysis();
