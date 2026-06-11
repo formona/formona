@@ -1,25 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
-import { AlertCircle, Camera, Download, Loader2, Settings } from 'lucide-react';
-import { IPD_CONFIG } from '../../../constants';
+import { RefreshCw, RotateCcw, ShieldCheck } from 'lucide-react';
+import { FACE_SHAPE_RESULT_COPY } from '../../../constants';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../../domain/measurement-copy';
-import { buildMeasurementDataPayload } from '../../../domain/measurement-payload';
 import { buildEyebrowRecommendationState, buildEyebrowRecommendationStateFromContext } from '../../../usecases/eyebrow-recommendations';
-import { cn } from '../utils';
 import {
-  type CameraPermissionState,
-  FaceShape,
   type EyebrowRecommendationContext,
   type EyebrowStyle,
+  FaceShape,
   type FaceAnalysisResult,
   type MeasurementDisplayItem,
 } from '../../../types';
-import { useFaceMeshTracker } from '../hooks/useFaceMeshTracker';
-import { CameraPreview } from './CameraPreview';
-import { Controls } from './Controls';
-import { EyebrowStyleCarousel } from './EyebrowStyleCarousel';
+import { FaceShapeImage } from './FaceShapeImage';
 
 interface ResultPageProps {
   faceShape: FaceShape | null;
@@ -31,37 +26,6 @@ interface ResultPageProps {
   onRetry: () => void;
   onApplyStyle: () => void;
 }
-
-const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>, ComponentType<{ size?: number; className?: string }>> = {
-  idle: Camera,
-  pending: Loader2,
-  denied: Settings,
-  unavailable: AlertCircle,
-};
-
-const getFaceShapeStatus = (faceShape: FaceShape | null, analysis: FaceAnalysisResult | null) => {
-  if (!analysis) {
-    return {
-      label: '얼굴형 분석 중',
-      detail: 'Face shape loading',
-      dotClassName: 'bg-main-brown/45 animate-pulse',
-    };
-  }
-
-  if (!faceShape) {
-    return {
-      label: '얼굴형 미확인',
-      detail: 'Face shape unknown',
-      dotClassName: 'bg-sub-gray/60',
-    };
-  }
-
-  return {
-    label: faceShape,
-    detail: 'Detected face shape',
-    dotClassName: 'bg-main-brown',
-  };
-};
 
 const buildDisplayedMeasurements = (analysis: FaceAnalysisResult | null): MeasurementDisplayItem[] => {
   if (!analysis) return [];
@@ -91,43 +55,9 @@ const getMeasurementGateMessage = (analysis: FaceAnalysisResult | null) => {
   return `기준점 신뢰도 ${Math.round(confidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${confidence.maxEstimatedErrorMm.toFixed(1)}mm입니다. 수치는 표시하고 데이터에는 검토 필요 품질 플래그를 함께 저장합니다.`;
 };
 
-const getLivePreviewMessage = ({
-  cameraPermission,
-  alignment,
-  hasLiveOverlay,
-  selectedStyle,
-}: {
-  cameraPermission: CameraPermissionState;
-  alignment: FaceAnalysisResult['alignment'];
-  hasLiveOverlay: boolean;
-  selectedStyle: EyebrowStyle | null;
-}) => {
-  if (cameraPermission !== 'granted') return '카메라를 다시 연결해 현재 모습으로 AR 미리보기를 준비합니다.';
-  if (!alignment.detected) return '얼굴을 화면 중앙에 맞추면 추천 눈썹이 실시간으로 표시됩니다.';
-  if (!alignment.ready) return alignment.guidance || '정면을 보고 잠시 고정하면 추천 눈썹이 표시됩니다.';
-  if (!hasLiveOverlay) return '눈썹 기준점을 추적하고 있습니다. 얼굴과 눈썹이 화면 안에 보이게 맞춰주세요.';
-  return `${selectedStyle?.name ?? '추천 눈썹'} 실시간 트레이싱 중`;
-};
-
-const downloadMeasurementData = (data: string) => {
-  const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
-  const objectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
-    ? URL.createObjectURL(blob)
-    : null;
-  const link = document.createElement('a');
-
-  link.href = objectUrl ?? `data:application/json;charset=utf-8,${encodeURIComponent(data)}`;
-  link.download = `formona-measurement-${Date.now()}.json`;
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-};
-
 export function ResultPage({
   faceShape,
+  capturedImage,
   analysis,
   recommendationContext,
   selectedStyle,
@@ -135,204 +65,152 @@ export function ResultPage({
   onRetry,
   onApplyStyle,
 }: ResultPageProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [measurementSaveMessage, setMeasurementSaveMessage] = useState<string | null>(null);
-  const recommendationState = recommendationContext
-    ? buildEyebrowRecommendationStateFromContext(recommendationContext)
-    : buildEyebrowRecommendationState(analysis);
-  const recommendations = recommendationState.status === 'ready' ? recommendationState.recommendations : [];
+  const recommendationState = useMemo(() => (
+    recommendationContext
+      ? buildEyebrowRecommendationStateFromContext(recommendationContext)
+      : buildEyebrowRecommendationState(analysis)
+  ), [analysis, recommendationContext]);
+  const recommendations = useMemo(() => (
+    recommendationState.status === 'ready' ? recommendationState.recommendations : []
+  ), [recommendationState]);
+  const resolvedStyle = selectedStyle ?? recommendations[0] ?? null;
+  const resolvedFaceShape = faceShape ?? analysis?.faceShape ?? recommendationContext?.faceShape ?? FaceShape.OVAL;
+  const resultCopy = FACE_SHAPE_RESULT_COPY[resolvedFaceShape];
   const measurements = buildDisplayedMeasurements(analysis);
   const measurementGateMessage = getMeasurementGateMessage(analysis);
-  const measurementPayload = useMemo(() => (
-    analysis ? buildMeasurementDataPayload({ analysis, selectedStyle }) : null
-  ), [analysis, selectedStyle]);
-  const previewIpdMm = recommendationContext?.ipdMm ?? analysis?.ipdMm ?? IPD_CONFIG.defaultMm;
-  const {
-    videoRef,
-    cameraPermission,
-    trackerStatus,
-    liveOverlayAnchors,
-    detectedFaceShape,
-    alignment,
-    ipdGuidance,
-    frameGuidance,
-    errorMessage,
-    requestCameraPermission,
-  } = useFaceMeshTracker({ ipdMm: previewIpdMm });
-  const PermissionIcon = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_ICONS[cameraPermission];
-  const liveFaceShape = detectedFaceShape ?? faceShape ?? analysis?.faceShape ?? null;
-  const faceShapeStatus = getFaceShapeStatus(liveFaceShape, analysis);
-  const hasLiveOverlay = Boolean(cameraPermission === 'granted' && alignment.ready && liveOverlayAnchors && selectedStyle);
-  const livePreviewMessage = getLivePreviewMessage({
-    cameraPermission,
-    alignment,
-    hasLiveOverlay,
-    selectedStyle,
-  });
 
   useEffect(() => {
-    if (cameraPermission !== 'idle') return;
-
-    void requestCameraPermission();
-  }, [cameraPermission, requestCameraPermission]);
-
-  useEffect(() => {
-    setMeasurementSaveMessage(null);
-  }, [measurementPayload]);
-
-  const handleSaveMeasurementData = useCallback(() => {
-    if (!measurementPayload) return;
-
-    downloadMeasurementData(JSON.stringify(measurementPayload, null, 2));
-    setMeasurementSaveMessage('측정 데이터가 생성되었습니다.');
-  }, [measurementPayload]);
+    if (!resolvedStyle && recommendations[0]) {
+      onSelectedStyleChange(recommendations[0]);
+    }
+  }, [onSelectedStyleChange, recommendations, resolvedStyle]);
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="app-container h-screen overflow-hidden relative"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="app-container overflow-hidden bg-white"
     >
-      <div className="absolute left-0 right-0 top-0 z-0 flex h-[min(62dvh,560px)] flex-col items-center overflow-hidden">
-        <div className="mt-20 mb-4 flex w-full justify-center px-6">
-          <div className="relative h-[min(46dvh,410px)] max-h-[410px] max-w-full aspect-[3/4] overflow-hidden rounded-lg border border-glass-border bg-main-brown/5">
-            <CameraPreview
-              videoRef={videoRef}
-              canvasRef={canvasRef}
-              cameraPermission={cameraPermission}
-              trackerStatus={trackerStatus}
-              alignment={alignment}
-              detectedFaceShape={detectedFaceShape}
-              liveOverlayAnchors={liveOverlayAnchors}
-              selectedRecommendation={selectedStyle}
-              ipdGuidance={ipdGuidance}
-              frameGuidance={frameGuidance}
-              errorMessage={errorMessage}
-              PermissionIcon={PermissionIcon}
-              onRequestCameraPermission={requestCameraPermission}
-              className="h-full rounded-none border-0 bg-main-brown/5 shadow-none"
-              showFaceGuidance={false}
-              guidanceMode="preview"
-            />
-            <div className="absolute left-4 right-4 top-5 flex items-start justify-between gap-3">
-              <div className="glass-pill flex items-center gap-2 rounded-2xl border-glass-border px-3 py-2">
-                <div className="w-2 h-2 bg-main-brown rounded-full animate-pulse" />
-                <span className="text-main-brown text-[10px] font-bold">LIVE AR</span>
-              </div>
-              <div
-                className="glass-pill max-w-[52%] rounded-2xl border-glass-border px-3 py-2 text-right"
-                aria-live="polite"
-              >
-                <div className="flex items-center justify-end gap-2">
-                  <span className={cn("h-2 w-2 shrink-0 rounded-full", faceShapeStatus.dotClassName)} />
-                  <span className="truncate text-[12px] font-bold text-main-brown">{faceShapeStatus.label}</span>
-                </div>
-                <p className="mt-0.5 truncate text-[9px] font-bold text-sub-gray/70">
-                  {faceShapeStatus.detail}
-                </p>
-              </div>
+      <div className="content-scrollable px-5 pb-[calc(118px+env(safe-area-inset-bottom))] pt-24">
+        <section className="space-y-5" aria-labelledby="result-heading">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-main-brown/55">분석 결과</p>
+              <p className="mt-3 text-[12px] font-bold text-main-brown/55">{resolvedFaceShape}</p>
+              <h2 id="result-heading" className="mt-1 text-[25px] font-bold leading-tight text-main-brown">
+                {resultCopy.title}
+              </h2>
             </div>
-            <div className="absolute bottom-4 left-4 right-4">
-              <div className="glass-pill rounded-2xl border-glass-border px-4 py-2 text-center">
-                <p className="truncate text-[11px] font-bold text-main-brown" aria-live="polite">
-                  {livePreviewMessage}
-                </p>
-              </div>
-            </div>
+            <FaceShapeImage faceShape={resolvedFaceShape} className="shrink-0" />
           </div>
-        </div>
 
-        <div className="mb-5 px-10 text-center space-y-2">
-          <h3 className="text-xl font-bold text-main-brown">{selectedStyle?.name}</h3>
-          <p className="text-sub-gray text-[14px] font-light leading-tight">당신에게 가장 잘 어울리는 스타일이에요.</p>
-        </div>
-      </div>
-
-      <div className="absolute inset-0 z-10 overflow-y-auto no-scrollbar pt-[min(62dvh,560px)]">
-        <div className="rounded-t-lg p-6 pb-[190px] min-h-screen bg-white border-t border-glass-border space-y-10">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3 px-2">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-4 bg-main-brown rounded-full" />
-                <h4 className="text-[14px] font-bold text-main-brown opacity-60">추천 스타일 변경</h4>
-              </div>
-              {selectedStyle && (
-                <span className="shrink-0 text-[12px] font-bold text-main-brown">{selectedStyle.name}</span>
-              )}
-            </div>
-            {recommendationState.status === 'ready' ? (
-              <EyebrowStyleCarousel
-                styles={recommendations}
-                selectedStyle={selectedStyle}
-                onSelectStyle={onSelectedStyleChange}
-                ariaLabel="AR 미리보기 눈썹 스타일 변경"
+          {capturedImage && (
+            <div className="overflow-hidden rounded-lg border border-main-brown/10 bg-main-brown/[0.03]">
+              <Image
+                src={capturedImage}
+                alt="분석 촬영 이미지"
+                width={390}
+                height={220}
+                unoptimized
+                className="object-cover"
+                style={{ width: '100%', height: '220px' }}
               />
-            ) : (
-              <div className="rounded-lg bg-main-brown/[0.04] px-4 py-5 text-center">
-                <p className="text-[13px] font-bold text-main-brown">{recommendationState.validation.title}</p>
-                <p className="mt-2 text-[12px] leading-relaxed text-sub-gray">{recommendationState.validation.message}</p>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-main-brown/10 bg-white p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-main-brown text-white">
+                <ShieldCheck size={16} aria-hidden="true" />
               </div>
-            )}
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold text-main-brown/55">추천 눈썹</p>
+                <h3 className="mt-1 text-[19px] font-bold leading-tight text-main-brown">
+                  {resolvedStyle?.name ?? resultCopy.insight}
+                </h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-sub-gray">
+                  {resultCopy.recommendationExplanation}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 px-2">
-              <div className="w-1.5 h-4 bg-main-brown rounded-full" />
-              <h4 className="text-[14px] font-bold text-main-brown opacity-60">측정 수치</h4>
+          {recommendations.length > 0 && (
+            <div className="space-y-2" aria-label="추천 눈썹 스타일 목록">
+              {recommendations.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => onSelectedStyleChange(style)}
+                  className={[
+                    'w-full rounded-lg border px-4 py-3 text-left transition',
+                    resolvedStyle?.id === style.id
+                      ? 'border-main-brown bg-main-brown/[0.04]'
+                      : 'border-main-brown/10 bg-white',
+                  ].join(' ')}
+                  aria-pressed={resolvedStyle?.id === style.id}
+                >
+                  <span className="block text-[14px] font-bold text-main-brown">{style.name}</span>
+                  <span className="mt-1 block text-[12px] leading-relaxed text-sub-gray">{style.description}</span>
+                </button>
+              ))}
             </div>
+          )}
+        </section>
 
-            {measurementGateMessage && (
-              <div className="mx-2 rounded-lg border border-main-brown/10 bg-main-brown/[0.04] px-4 py-3">
-                <p className="text-[12px] font-bold text-main-brown">측정값 재확인 필요</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-sub-gray">{measurementGateMessage}</p>
-              </div>
-            )}
+        <section className="mt-8 space-y-5" aria-labelledby="measurement-heading">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-1.5 rounded-full bg-main-brown" />
+              <h3 id="measurement-heading" className="text-[14px] font-bold text-main-brown/60">측정 수치</h3>
+            </div>
+            <span className="text-[11px] font-bold text-sub-gray">
+              {analysis ? `${analysis.ipdMm.toFixed(1)}mm IPD 기준` : '측정 대기'}
+            </span>
+          </div>
 
-            <div className="mx-2 flex items-center justify-between gap-3 rounded-lg border border-main-brown/10 bg-main-brown/[0.03] px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-[12px] font-bold text-main-brown">포모나 전달용 데이터</p>
-                {measurementSaveMessage && (
-                  <p className="mt-1 text-[11px] font-bold text-sub-gray" aria-live="polite">
-                    {measurementSaveMessage}
+          {measurementGateMessage && (
+            <div className="rounded-lg border border-main-brown/10 bg-main-brown/[0.04] px-4 py-3">
+              <p className="text-[12px] font-bold text-main-brown">측정값 재확인 필요</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-sub-gray">{measurementGateMessage}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            {measurements.map((measurement) => (
+              <div key={measurement.label} className="min-w-0 rounded-lg border border-main-brown/10 bg-white px-3 py-3">
+                <p className="break-keep text-[10px] font-bold leading-tight text-sub-gray">{measurement.label}</p>
+                <p className="mt-1 text-[10px] leading-snug text-sub-gray/80">{measurement.description}</p>
+                <p className="mt-2 text-[18px] font-bold leading-none text-main-brown tabular-nums">{measurement.value}</p>
+                {measurement.confidence && (
+                  <p className="mt-1 text-[10px] font-bold text-sub-gray">
+                    +/-{measurement.confidence.estimatedErrorMm.toFixed(1)}mm
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={handleSaveMeasurementData}
-                disabled={!measurementPayload}
-                className="btn btn-subtle min-h-11 shrink-0 rounded-lg px-3 text-[12px]"
-              >
-                <Download size={15} aria-hidden="true" />
-                데이터 저장
-              </button>
-            </div>
-
-            <div className="space-y-4 px-2">
-              {measurements.map((measurement) => (
-                <div key={measurement.label} className="flex justify-between items-center py-3 border-b border-divider last:border-0">
-                  <div className="space-y-1">
-                    <p className="text-[14px] font-bold text-main-brown leading-none">{measurement.label}</p>
-                    <p className="text-[11px] font-light text-sub-gray">{measurement.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[18px] font-bold text-main-brown tabular-nums">{measurement.value}</p>
-                    {measurement.confidence && (
-                      <p className="mt-1 text-[10px] font-bold text-sub-gray">
-                        +/-{measurement.confidence.estimatedErrorMm.toFixed(1)}mm
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
+        </section>
+      </div>
 
-          <Controls
-            mode="result"
-            onRetry={onRetry}
-            onApplyStyle={onApplyStyle}
-          />
+      <div className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-main-brown/10 bg-white px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-4">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="btn btn-secondary min-h-[58px] flex-1 text-main-brown"
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+            다시 찍기
+          </button>
+          <button
+            type="button"
+            onClick={onApplyStyle}
+            className="btn btn-primary min-h-[58px] flex-[1.15]"
+          >
+            처음으로
+            <RotateCcw size={18} aria-hidden="true" />
+          </button>
         </div>
       </div>
     </motion.div>

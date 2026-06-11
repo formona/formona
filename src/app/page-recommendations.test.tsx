@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HomePage from './page';
 import { APP_TIMING_MS, FACE_SHAPE_RESULT_COPY } from '../constants';
+import { MEASUREMENT_RECORD_STORAGE_KEY, parseMeasurementRecords } from '../domain/measurement-records';
 import {
   FaceShape,
   type EyebrowOverlayAnchors,
@@ -245,6 +246,7 @@ const makeAnalysis = (faceShape: FaceShape): FaceAnalysisResult => ({
 describe('HomePage recommendation routing', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.clear();
     analysisMock.current = makeAnalysis(FaceShape.HEART);
     capturePageMock.props = [];
   });
@@ -267,9 +269,16 @@ describe('HomePage recommendation routing', () => {
     expect(screen.getAllByText(FaceShape.HEART).length).toBeGreaterThan(0);
     expect(screen.getAllByText('직선 수평형').length).toBeGreaterThan(0);
     expect(screen.queryByText('자연 아치형')).not.toBeInTheDocument();
+
+    const records = parseMeasurementRecords(localStorage.getItem(MEASUREMENT_RECORD_STORAGE_KEY));
+    expect(records).toHaveLength(1);
+    expect(records[0]?.payload).toMatchObject({
+      faceShape: FaceShape.HEART,
+      selectedStyle: { name: '직선 수평형' },
+    });
   });
 
-  it('continues to recommendations when captured geometry confidence is zero but measurements are valid', async () => {
+  it('continues to results when captured geometry confidence is zero but measurements are valid', async () => {
     const analysis = makeAnalysis(FaceShape.HEART);
     analysisMock.current = {
       ...analysis,
@@ -333,7 +342,7 @@ describe('HomePage recommendation routing', () => {
     expect(capturePageMock.props.at(-1)).toEqual({ autoStartCamera: false });
 
     fireEvent.click(screen.getByRole('button', { name: 'Mock capture complete' }));
-    fireEvent.click(screen.getByRole('button', { name: '다시 스캔' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 찍기' }));
 
     expect(screen.getByText('Mock camera auto-start')).toBeInTheDocument();
     expect(capturePageMock.props.at(-1)).toEqual({ autoStartCamera: true });

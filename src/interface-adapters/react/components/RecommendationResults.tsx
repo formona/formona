@@ -90,7 +90,7 @@ export function RecommendationResults({
                 <p className="text-[12px] font-bold text-main-brown/55">추천 근거</p>
                 <h3 className="text-[19px] font-bold leading-tight text-main-brown">{resultCopy.insight}</h3>
                 <p className="text-[13px] leading-relaxed text-sub-gray">
-                  얼굴형 분석 결과와 눈썹 라인의 상승감, 아치 높이, 시작점 균형을 함께 반영한 MVP 추천입니다.
+                  {resultCopy.recommendationExplanation}
                 </p>
               </div>
             </div>
@@ -114,7 +114,7 @@ export function RecommendationResults({
 
         <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 border-t border-main-brown/10 bg-white px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-4">
           <p className="mb-3 text-center text-[12px] font-light leading-relaxed text-sub-gray">
-            추천 스타일을 선택한 뒤 AR 미리보기로 확인하세요.
+            추천 스타일을 선택한 뒤 결과 설명과 측정 수치를 확인하세요.
           </p>
           <div className="flex gap-3">
             <button
@@ -130,7 +130,7 @@ export function RecommendationResults({
               onClick={() => onSelectRecommendation(selectedStyle, recommendationContext)}
               className="btn btn-primary min-h-[58px] flex-[1.25]"
             >
-              AR 미리보기
+              결과 보기
               <ChevronRight size={18} aria-hidden="true" />
             </button>
           </div>

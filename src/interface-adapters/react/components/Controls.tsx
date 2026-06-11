@@ -68,9 +68,6 @@ export const Controls = (props: ControlsProps) => {
 
   return (
     <div className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-main-brown/10 bg-white px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-4">
-      <p className="mb-3 text-center text-[12px] font-light leading-relaxed text-sub-gray">
-        AR 미리보기를 확인한 뒤 다시 촬영하거나 처음 단계로 돌아가세요.
-      </p>
       <div className="flex gap-3">
         <button
           type="button"

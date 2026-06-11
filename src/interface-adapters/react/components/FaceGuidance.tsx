@@ -83,7 +83,7 @@ export const FaceGuidance = ({
   ));
   const statusLabel = trackerStatus === 'ready' ? 'FaceMesh 추적 중' : 'FaceMesh 준비 중';
   const guidanceMessage = fallbackState?.action ?? (faceDetected ? alignment.guidance : '정면을 바라봐 주세요');
-  const fallbackPrefix = mode === 'preview' ? 'AR 미리보기 대기' : 'AR 캡처 대기';
+  const fallbackPrefix = mode === 'preview' ? '분석 미리보기 대기' : '얼굴 분석 대기';
   const guideColor = aligned
     ? BRAND_COLORS.faceGuideDetected
     : faceDetected

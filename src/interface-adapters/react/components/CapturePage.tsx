@@ -10,9 +10,9 @@ import { Controls } from './Controls';
 import type { CameraPermissionState, FaceAnalysisResult } from '../../../types';
 import { buildEyebrowRecommendationState } from '../../../usecases/eyebrow-recommendations';
 import { EYEBROW_METRIC_DISPLAY_KEYS } from '../../../domain/measurement-copy';
+import { APP_TIMING_MS, FEATURE_FLAGS } from '../../../constants';
 
 const AUTO_ANALYSIS_DELAY_MS = 650;
-const ANALYSIS_TRANSITION_DELAY_MS = 450;
 
 const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>, React.ComponentType<{ size?: number; className?: string }>> = {
   idle: Camera,
@@ -106,7 +106,7 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
     window.setTimeout(() => {
       onAnalysisComplete(capturedImage, currentAnalysis);
       setIsAnalyzing(false);
-    }, ANALYSIS_TRANSITION_DELAY_MS);
+    }, APP_TIMING_MS.analysisTransition);
   }, [onAnalysisComplete, stopCameraStream]);
 
   const alignmentReady = Boolean(alignment.ready ?? (
@@ -137,6 +137,7 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
   }, [analysis, cameraPermission, captureCurrentFrame, captureReady, completeAnalysis, isAnalyzing]);
 
   const liveRecommendation = useMemo(() => {
+    if (!FEATURE_FLAGS.arEyebrowOverlayEnabled) return null;
     if (!analysis) return null;
 
     const recommendationState = buildEyebrowRecommendationState(analysis);
@@ -209,8 +210,8 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
     <div className="app-container relative bg-white px-3 pb-[calc(92px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))]">
       <div className="mb-2 flex items-center justify-between gap-3 pl-[52px] pr-1">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold text-main-brown/55">AR 캡처</p>
-          <h2 className="mt-0.5 truncate text-[18px] font-bold leading-tight text-main-brown">얼굴 정렬 후 촬영</h2>
+          <p className="text-[10px] font-bold text-main-brown/55">얼굴 분석</p>
+          <h2 className="mt-0.5 truncate text-[18px] font-bold leading-tight text-main-brown">얼굴 정렬 후 측정</h2>
         </div>
         <div
           className={cn(
@@ -312,6 +313,14 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
               <div className="mt-7 space-y-3">
                 <h3 className="text-xl font-bold text-main-brown">AI 스타일 정밀 분석</h3>
                 <p className="text-sub-gray text-xs font-light">얼굴형과 비율을 측정하고 있습니다</p>
+                <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-main-brown/10" aria-label="분석 진행 중">
+                  <motion.div
+                    className="h-full rounded-full bg-main-brown"
+                    initial={{ width: '12%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: APP_TIMING_MS.analysisTransition / 1000, ease: 'easeInOut' }}
+                  />
+                </div>
                 <div className="flex justify-center gap-2 pt-1" aria-hidden="true">
                   {['얼굴형', '비율', '눈썹선'].map((step, index) => (
                     <motion.span

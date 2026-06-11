@@ -18,6 +18,7 @@ export interface FaceShapeResultCopy {
   title: string;
   description: string;
   insight: string;
+  recommendationExplanation: string;
 }
 
 export interface MeasurementDisplayItem {

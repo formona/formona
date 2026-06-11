@@ -163,7 +163,7 @@ describe('real camera and MediaPipe initialization smoke flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('AR 캡처 대기: 얼굴 미감지')).toBeInTheDocument();
+      expect(screen.getByText('얼굴 분석 대기: 얼굴 미감지')).toBeInTheDocument();
       expect(screen.getByText('얼굴을 찾고 있어요')).toBeInTheDocument();
       expect(screen.getByText('얼굴 전체가 가이드 안에 들어오도록 카메라를 정면으로 맞춰주세요.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '얼굴 정렬 필요' })).toBeDisabled();
