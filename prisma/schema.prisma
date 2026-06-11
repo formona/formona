@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model MeasurementRecord {
+  id                  String   @id @default(cuid())
+  savedAt             DateTime @default(now())
+  measuredAt          DateTime
+  faceShape           String
+  selectedStyleId     String?
+  selectedStyleName   String?
+  ipdMm               Float
+  reportable          Boolean
+  overallConfidence   Float?
+  maxEstimatedErrorMm Float?
+  payload             Json
+
+  @@index([savedAt])
+  @@index([faceShape])
+  @@index([reportable])
+  @@map("measurement_records")
+}

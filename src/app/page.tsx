@@ -20,13 +20,7 @@ import { CapturePage } from '../interface-adapters/react/components/CapturePage'
 import { RecommendationResults } from '../interface-adapters/react/components/RecommendationResults';
 import { ResultPage } from '../interface-adapters/react/components/ResultPage';
 import { parseValidIpd, resolveIpdFallback, type IpdFallbackSource } from '../usecases/ipd';
-import { buildMeasurementDataPayload } from '../domain/measurement-payload';
-import {
-  addMeasurementRecord,
-  MEASUREMENT_RECORD_STORAGE_KEY,
-  parseMeasurementRecords,
-  serializeMeasurementRecords,
-} from '../domain/measurement-records';
+import { buildMeasurementDataPayload, type MeasurementDataPayload } from '../domain/measurement-payload';
 
 const getIpdFallbackNotice = (source: IpdFallbackSource, value: number) => {
   if (source === 'last-valid') {
@@ -38,6 +32,20 @@ const getIpdFallbackNotice = (source: IpdFallbackSource, value: number) => {
   }
 
   return null;
+};
+
+const saveMeasurementRecord = async (payload: MeasurementDataPayload) => {
+  try {
+    await fetch('/api/measurements', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Result rendering should not depend on remote admin storage availability.
+  }
 };
 
 export default function HomePage() {
@@ -89,17 +97,7 @@ export default function HomePage() {
     setSelectedStyle(nextSelectedStyle);
     setAutoStartCapture(false);
     if (nextRecommendationState.status === 'ready') {
-      try {
-        const rawRecords = localStorage.getItem(MEASUREMENT_RECORD_STORAGE_KEY);
-        const records = parseMeasurementRecords(rawRecords);
-        const payload = buildMeasurementDataPayload({ analysis, selectedStyle: nextSelectedStyle });
-        localStorage.setItem(
-          MEASUREMENT_RECORD_STORAGE_KEY,
-          serializeMeasurementRecords(addMeasurementRecord(records, payload)),
-        );
-      } catch {
-        // Result rendering should not depend on local admin storage availability.
-      }
+      void saveMeasurementRecord(buildMeasurementDataPayload({ analysis, selectedStyle: nextSelectedStyle }));
       setCurrentPage(Page.RESULT);
       return;
     }

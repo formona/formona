@@ -11,6 +11,9 @@ overlay visualization.
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key.
+   For DB-backed admin measurements, also set `PRISMA_DATABASE_URL` or
+   `POSTGRES_URL`. Set `FORMONA_ADMIN_PASSCODE` to override the demo admin
+   passcode.
 3. Run the app:
    `npm run dev`
 
@@ -28,6 +31,8 @@ Source follows a clean architecture split:
   explicit ports.
 - `src/interface-adapters`: React components, hooks, and UI helpers.
 - `src/infrastructure`: browser and MediaPipe adapters.
+- `src/app/api`: server API routes for measurement persistence and admin data
+  access.
 
 Dependency direction is inward: interface adapters and infrastructure call
 usecases/domain, while domain code does not import React, Next.js, MediaPipe, or
@@ -40,6 +45,26 @@ browser APIs.
 - `npm run test:unit`
 - `npm run test:coverage`
 - `npm run test:e2e`
+
+## Measurement Storage
+
+Measurement results are stored in Prisma Postgres through:
+
+- `POST /api/measurements`: saves the measurement payload generated after face
+  analysis.
+- `GET /api/admin/measurements`: returns saved records for the admin page when
+  the `x-formona-admin-passcode` header matches `FORMONA_ADMIN_PASSCODE`.
+
+Database setup uses Prisma migrations:
+
+```sh
+npm run db:generate
+npm run db:migrate:deploy
+```
+
+The current schema stores searchable summary columns plus the full
+`formona.measurement.v1` payload JSON for export and downstream mold-production
+workflows.
 
 Coverage is scoped to app source under `src/` and excludes tests, test setup,
 type-only declarations, generated output, build output, e2e files, the Next.js

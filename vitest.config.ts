@@ -33,6 +33,7 @@ export default defineConfig({
         'src/**/*.d.ts',
         'src/test/**',
         'src/**/types.ts',
+        'src/generated/**',
         'src/app/icon.svg',
         'src/app/layout.tsx',
         'src/app/page.tsx',
