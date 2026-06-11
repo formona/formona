@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Download, LockKeyhole, LogOut, RefreshCw } from 'lucide-react';
+import { Download, Eye, EyeOff, LockKeyhole, LogOut, RefreshCw } from 'lucide-react';
 import {
   parseMeasurementRecords,
   type StoredMeasurementRecord,
@@ -92,6 +92,7 @@ const buildRecordsCsv = (records: StoredMeasurementRecord[]) => {
 export default function AdminPage() {
   const [authStatus, setAuthStatus] = useState<'checking' | 'locked' | 'unlocked'>('checking');
   const [passcode, setPasscode] = useState('');
+  const [isPasscodeVisible, setIsPasscodeVisible] = useState(false);
   const [authError, setAuthError] = useState('');
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState<string | null>(null);
@@ -215,6 +216,7 @@ export default function AdminPage() {
     setRecords([]);
     setSelectedRecordId(null);
     setPasscode('');
+    setIsPasscodeVisible(false);
     setAuthError('');
     setAuthStatus('locked');
   };
@@ -232,26 +234,38 @@ export default function AdminPage() {
           <p className="mt-5 text-[11px] font-bold text-main-brown/55">FORMONA ADMIN</p>
           <h1 className="mt-2 text-2xl font-bold leading-tight">관리자 접근</h1>
           <p className="mt-2 text-sm leading-relaxed text-sub-gray">
-            측정 수치 확인을 위해 데모 관리자 비밀번호를 입력해주세요.
+            측정 수치 확인을 위해 관리자 비밀번호를 입력해주세요.
           </p>
 
           <label htmlFor="admin-passcode" className="mt-6 block text-xs font-bold text-sub-gray">
             비밀번호
           </label>
-          <input
-            id="admin-passcode"
-            type="password"
-            value={passcode}
-            onChange={(event) => {
-              setPasscode(event.target.value);
-              if (authError) setAuthError('');
-            }}
-            autoComplete="current-password"
-            disabled={authStatus === 'checking' || recordsLoading}
-            aria-invalid={authError ? 'true' : 'false'}
-            aria-describedby={authError ? 'admin-passcode-error' : undefined}
-            className="mt-2 h-12 w-full rounded-lg border border-main-brown/20 bg-white px-3 text-base font-bold text-main-brown outline-none transition focus:border-main-brown"
-          />
+          <div className="relative mt-2">
+            <input
+              id="admin-passcode"
+              type={isPasscodeVisible ? 'text' : 'password'}
+              value={passcode}
+              onChange={(event) => {
+                setPasscode(event.target.value);
+                if (authError) setAuthError('');
+              }}
+              autoComplete="current-password"
+              disabled={authStatus === 'checking' || recordsLoading}
+              aria-invalid={authError ? 'true' : 'false'}
+              aria-describedby={authError ? 'admin-passcode-error' : undefined}
+              className="h-12 w-full rounded-lg border border-main-brown/20 bg-white px-3 pr-12 text-base font-bold text-main-brown outline-none transition focus:border-main-brown"
+            />
+            <button
+              type="button"
+              onClick={() => setIsPasscodeVisible((current) => !current)}
+              disabled={authStatus === 'checking' || recordsLoading}
+              aria-label={isPasscodeVisible ? '비밀번호 숨기기' : '비밀번호 보기'}
+              title={isPasscodeVisible ? '비밀번호 숨기기' : '비밀번호 보기'}
+              className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-main-brown/65 transition hover:bg-main-brown/[0.06] hover:text-main-brown focus-visible:outline focus-visible:outline-3 focus-visible:outline-main-brown/20 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {isPasscodeVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
           {authError && (
             <p id="admin-passcode-error" className="mt-2 text-xs font-bold text-red-600">
               {authError}

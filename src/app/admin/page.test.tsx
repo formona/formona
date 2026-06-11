@@ -66,6 +66,20 @@ describe('AdminPage', () => {
     expect(screen.queryByRole('heading', { name: '사용자 측정 수치' })).not.toBeInTheDocument();
   });
 
+  it('toggles passcode visibility from the admin login form', async () => {
+    render(<AdminPage />);
+
+    const passcodeInput = await screen.findByLabelText('비밀번호');
+
+    expect(passcodeInput).toHaveAttribute('type', 'password');
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 보기' }));
+
+    expect(passcodeInput).toHaveAttribute('type', 'text');
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 숨기기' }));
+
+    expect(passcodeInput).toHaveAttribute('type', 'password');
+  });
+
   it('shows measurement records after the demo passcode is accepted', async () => {
     render(<AdminPage />);
 
