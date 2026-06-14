@@ -11,6 +11,7 @@ export enum Page {
   CAPTURE = 3,
   RECOMMENDATIONS = 4,
   RESULT = 5,
+  ADDRESS = 6,
 }
 
 export const BRAND_COLORS = {
@@ -31,6 +32,7 @@ export const IPD_CONFIG = {
 
 export const APP_TIMING_MS = {
   splash: 1500,
+  recognitionHold: 1800,
   analysisTransition: 1600,
 } as const;
 

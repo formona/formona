@@ -142,9 +142,9 @@ describe('real camera and MediaPipe initialization smoke flow', () => {
     await waitFor(() => {
       expect(screen.getByText('FaceMesh 추적 중')).toBeInTheDocument();
       expect(screen.getByText('계란형 감지')).toBeInTheDocument();
-      expect(screen.getByText('자동 분석')).toBeInTheDocument();
+      expect(screen.getByText('인식 완료')).toBeInTheDocument();
       expect(screen.getByText('정면 위치가 안정적입니다')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '인식 완료' })).toBeDisabled();
     });
   });
 
