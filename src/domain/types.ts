@@ -275,6 +275,7 @@ export interface FaceAlignment {
   distanceOk: boolean;
   pitchOk: boolean;
   yawOk: boolean;
+  gazeOk?: boolean;
   guidance: string;
   confidence: number;
   offsetX?: number;
@@ -285,6 +286,9 @@ export interface FaceAlignment {
   distanceState?: 'too_far' | 'ok' | 'too_close' | 'unknown';
   horizontalDirection?: 'left' | 'center' | 'right';
   verticalDirection?: 'up' | 'center' | 'down';
+  gazeDirection?: 'left' | 'center' | 'right' | 'unknown';
+  gazeVerticalDirection?: 'up' | 'center' | 'down' | 'unknown';
+  gazeOffset?: number;
   ready?: boolean;
 }
 

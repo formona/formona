@@ -787,6 +787,78 @@ describe('AR flow utilities', () => {
       guidance: '고개를 기울이지 말고 정면을 바라봐 주세요',
       ready: false,
     });
+
+    expect(buildFaceAlignment(makeLandmarks({
+      0: landmark(0.59, 0.57),
+      98: landmark(0.54, 0.56),
+      164: landmark(0.58, 0.6),
+      327: landmark(0.64, 0.56),
+    }))).toMatchObject({
+      yawOk: false,
+      guidance: '얼굴을 돌리지 말고 정면을 바라봐 주세요',
+      ready: false,
+    });
+
+    expect(buildFaceAlignment(makeLandmarks({
+      0: landmark(0.5, 0.7),
+      98: landmark(0.44, 0.68),
+      164: landmark(0.5, 0.74),
+      327: landmark(0.56, 0.68),
+    }))).toMatchObject({
+      pitchOk: false,
+      guidance: '고개를 들거나 숙이지 말고 정면을 바라봐 주세요',
+      ready: false,
+    });
+  });
+
+  it('blocks capture when a front-facing face looks away from the camera lens', () => {
+    const sideGazeFace = makeLandmarks({
+      468: landmark(0.414, 0.43),
+      469: landmark(0.414, 0.428),
+      470: landmark(0.416, 0.43),
+      471: landmark(0.414, 0.432),
+      472: landmark(0.412, 0.43),
+      473: landmark(0.654, 0.43),
+      474: landmark(0.654, 0.428),
+      475: landmark(0.656, 0.43),
+      476: landmark(0.654, 0.432),
+      477: landmark(0.652, 0.43),
+    });
+
+    expect(buildFaceAlignment(sideGazeFace)).toMatchObject({
+      centered: true,
+      distanceOk: true,
+      pitchOk: true,
+      yawOk: true,
+      gazeOk: false,
+      gazeDirection: 'right',
+      guidance: '카메라 렌즈를 정면으로 바라봐 주세요',
+      ready: false,
+    });
+  });
+
+  it('blocks capture when a front-facing face looks down instead of at the camera lens', () => {
+    const downwardGazeFace = makeLandmarks({
+      468: landmark(0.38, 0.448),
+      469: landmark(0.378, 0.448),
+      470: landmark(0.38, 0.446),
+      471: landmark(0.382, 0.448),
+      472: landmark(0.38, 0.45),
+      473: landmark(0.62, 0.448),
+      474: landmark(0.618, 0.448),
+      475: landmark(0.62, 0.446),
+      476: landmark(0.622, 0.448),
+      477: landmark(0.62, 0.45),
+    });
+
+    expect(buildFaceAlignment(downwardGazeFace)).toMatchObject({
+      centered: true,
+      gazeOk: false,
+      gazeDirection: 'center',
+      gazeVerticalDirection: 'down',
+      guidance: '카메라 렌즈를 정면으로 바라봐 주세요',
+      ready: false,
+    });
   });
 
   it('maps every supported face shape to three recommendation styles', () => {

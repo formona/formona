@@ -58,6 +58,19 @@ const MAX_FACE_HEIGHT = 0.9;
 const MIN_FACE_WIDTH = 0.18;
 const MIN_PITCH_HEIGHT = 0.24;
 const MAX_EYE_TILT = 0.07;
+const MIN_EYE_WIDTH_FOR_GAZE = 0.035;
+const MIN_EYE_HEIGHT_FOR_GAZE = 0.018;
+const MIN_IRIS_POINTS_FOR_GAZE = 3;
+const MAX_GAZE_DIRECTIONAL_OFFSET = 0.18;
+const MAX_GAZE_VERTICAL_OFFSET = 0.32;
+const GAZE_DIRECTION_OFFSET = 0.16;
+const GAZE_VERTICAL_DIRECTION_OFFSET = 0.24;
+const MAX_HEAD_YAW_NOSE_OFFSET_RATIO = 0.09;
+const MAX_HEAD_YAW_EYE_WIDTH_ASYMMETRY = 0.34;
+const MIN_HEAD_PITCH_NOSE_RATIO = 0.22;
+const MAX_HEAD_PITCH_NOSE_RATIO = 0.5;
+const MIN_HEAD_PITCH_PHILTRUM_RATIO = 0.34;
+const MAX_HEAD_PITCH_PHILTRUM_RATIO = 0.68;
 const MIN_NORMALIZED_IPD = 0.065;
 const MAX_NORMALIZED_IPD = 0.45;
 const MIN_IPD_PIXEL_RATIO = 0.045;
@@ -262,6 +275,198 @@ const isPlausibleIpdDistance = (
   const widthRatio = pupilIpd.ipdPx / dimensions.width;
 
   return widthRatio >= MIN_IPD_PIXEL_RATIO && widthRatio <= MAX_IPD_PIXEL_RATIO;
+};
+
+const getIrisCenterOffset = (
+  landmarks: FacePoint[],
+  outerIndex: number,
+  innerIndex: number,
+  topIndex: number,
+  bottomIndex: number,
+  irisIndices: readonly number[],
+) => {
+  const outer = getLandmarkPoint(landmarks, outerIndex);
+  const inner = getLandmarkPoint(landmarks, innerIndex);
+  const top = getLandmarkPoint(landmarks, topIndex);
+  const bottom = getLandmarkPoint(landmarks, bottomIndex);
+  const irisPoints = validLandmarkPoints(landmarks, irisIndices);
+
+  if (!outer || !inner || !top || !bottom || irisPoints.length < MIN_IRIS_POINTS_FOR_GAZE) {
+    return null;
+  }
+
+  if (
+    !hasValidLandmarkPoint(outer)
+    || !hasValidLandmarkPoint(inner)
+    || !hasValidLandmarkPoint(top)
+    || !hasValidLandmarkPoint(bottom)
+  ) {
+    return null;
+  }
+
+  const irisCenter = averagePoints(irisPoints);
+  if (!irisCenter) return null;
+
+  const minX = Math.min(outer.x, inner.x);
+  const maxX = Math.max(outer.x, inner.x);
+  const eyeWidth = maxX - minX;
+  if (!Number.isFinite(eyeWidth) || eyeWidth < MIN_EYE_WIDTH_FOR_GAZE) {
+    return null;
+  }
+  const minY = Math.min(top.y, bottom.y);
+  const maxY = Math.max(top.y, bottom.y);
+  const eyeHeight = maxY - minY;
+  if (!Number.isFinite(eyeHeight) || eyeHeight < MIN_EYE_HEIGHT_FOR_GAZE) {
+    return null;
+  }
+
+  return {
+    x: clamp((irisCenter.x - ((minX + maxX) / 2)) / eyeWidth, -1, 1),
+    y: clamp((irisCenter.y - ((minY + maxY) / 2)) / eyeHeight, -1, 1),
+  };
+};
+
+const buildGazeAlignment = (
+  landmarks: FacePoint[],
+): Pick<FaceAlignment, 'gazeOk' | 'gazeDirection' | 'gazeVerticalDirection' | 'gazeOffset'> & { evaluated: boolean } => {
+  const leftOffset = getIrisCenterOffset(
+    landmarks,
+    FACE_MESH_LANDMARKS.leftEyeOuter,
+    FACE_MESH_LANDMARKS.leftEyeInner,
+    FACE_MESH_LANDMARKS.leftEyeTop,
+    FACE_MESH_LANDMARKS.leftEyeBottom,
+    FACE_MESH_LANDMARKS.leftIris,
+  );
+  const rightOffset = getIrisCenterOffset(
+    landmarks,
+    FACE_MESH_LANDMARKS.rightEyeOuter,
+    FACE_MESH_LANDMARKS.rightEyeInner,
+    FACE_MESH_LANDMARKS.rightEyeTop,
+    FACE_MESH_LANDMARKS.rightEyeBottom,
+    FACE_MESH_LANDMARKS.rightIris,
+  );
+
+  if (leftOffset === null || rightOffset === null) {
+    return {
+      evaluated: false,
+      gazeOk: true,
+      gazeDirection: 'unknown',
+      gazeVerticalDirection: 'unknown',
+      gazeOffset: 0,
+    };
+  }
+
+  const averageHorizontalOffset = (leftOffset.x + rightOffset.x) / 2;
+  const averageVerticalOffset = (leftOffset.y + rightOffset.y) / 2;
+  const gazeOffset = Math.max(Math.abs(averageHorizontalOffset), Math.abs(averageVerticalOffset));
+  const gazeOk = Math.abs(averageHorizontalOffset) <= MAX_GAZE_DIRECTIONAL_OFFSET
+    && Math.abs(averageVerticalOffset) <= MAX_GAZE_VERTICAL_OFFSET;
+  const gazeDirection = averageHorizontalOffset < -GAZE_DIRECTION_OFFSET
+    ? 'left'
+    : averageHorizontalOffset > GAZE_DIRECTION_OFFSET
+      ? 'right'
+      : 'center';
+  const gazeVerticalDirection = averageVerticalOffset < -GAZE_VERTICAL_DIRECTION_OFFSET
+    ? 'up'
+    : averageVerticalOffset > GAZE_VERTICAL_DIRECTION_OFFSET
+      ? 'down'
+      : 'center';
+
+  return {
+    evaluated: true,
+    gazeOk,
+    gazeDirection,
+    gazeVerticalDirection,
+    gazeOffset,
+  };
+};
+
+const getAverageValidPoint = (
+  landmarks: FacePoint[],
+  indices: readonly number[],
+) => {
+  const points = validLandmarkPoints(landmarks, indices)
+    .filter((point) => point.x !== 0 || point.y !== 0);
+
+  return points.length ? averagePoints(points) : null;
+};
+
+const getPoseLandmarkPoint = (
+  landmarks: FacePoint[],
+  index: number,
+) => {
+  const point = getLandmarkPoint(landmarks, index);
+
+  if (!point || !hasValidLandmarkPoint(point)) return null;
+
+  return point.x !== 0 || point.y !== 0 ? point : null;
+};
+
+const buildHeadPoseAlignment = (
+  landmarks: FacePoint[],
+  faceCenterX: number,
+  faceWidth: number,
+) => {
+  const leftEyeOuter = getLandmarkPoint(landmarks, FACE_MESH_LANDMARKS.leftEyeOuter);
+  const leftEyeInner = getLandmarkPoint(landmarks, FACE_MESH_LANDMARKS.leftEyeInner);
+  const rightEyeOuter = getLandmarkPoint(landmarks, FACE_MESH_LANDMARKS.rightEyeOuter);
+  const rightEyeInner = getLandmarkPoint(landmarks, FACE_MESH_LANDMARKS.rightEyeInner);
+  const chin = getPoseLandmarkPoint(landmarks, FACE_MESH_LANDMARKS.chin);
+  const philtrum = getPoseLandmarkPoint(landmarks, FACE_MESH_LANDMARKS.philtrum);
+  const noseCenter = getAverageValidPoint(landmarks, [
+    FACE_MESH_LANDMARKS.noseBottomCenter,
+    FACE_MESH_LANDMARKS.leftNostril,
+    FACE_MESH_LANDMARKS.rightNostril,
+  ]) ?? philtrum;
+  const eyeCenter = getAverageValidPoint(landmarks, [
+    FACE_MESH_LANDMARKS.leftEyeOuter,
+    FACE_MESH_LANDMARKS.leftEyeInner,
+    FACE_MESH_LANDMARKS.leftEyeTop,
+    FACE_MESH_LANDMARKS.leftEyeBottom,
+    FACE_MESH_LANDMARKS.rightEyeOuter,
+    FACE_MESH_LANDMARKS.rightEyeInner,
+    FACE_MESH_LANDMARKS.rightEyeTop,
+    FACE_MESH_LANDMARKS.rightEyeBottom,
+  ]);
+
+  const leftEyeWidth = leftEyeOuter && leftEyeInner ? normalizedDistance(leftEyeOuter, leftEyeInner) : 0;
+  const rightEyeWidth = rightEyeOuter && rightEyeInner ? normalizedDistance(rightEyeOuter, rightEyeInner) : 0;
+  const averageEyeWidth = (leftEyeWidth + rightEyeWidth) / 2;
+  const eyeWidthAsymmetry = averageEyeWidth > 0
+    ? Math.abs(leftEyeWidth - rightEyeWidth) / averageEyeWidth
+    : 0;
+  const noseOffsetRatio = noseCenter && faceWidth > 0
+    ? Math.abs(noseCenter.x - faceCenterX) / faceWidth
+    : 0;
+  const yawEvaluated = Boolean(noseCenter && faceWidth > 0 && averageEyeWidth > 0);
+  const yawOk = !yawEvaluated || (
+    noseOffsetRatio <= MAX_HEAD_YAW_NOSE_OFFSET_RATIO
+    && eyeWidthAsymmetry <= MAX_HEAD_YAW_EYE_WIDTH_ASYMMETRY
+  );
+
+  const pitchBase = eyeCenter && chin ? chin.y - eyeCenter.y : 0;
+  const nosePitchRatio = eyeCenter && noseCenter && pitchBase > 0
+    ? (noseCenter.y - eyeCenter.y) / pitchBase
+    : 0;
+  const philtrumPitchRatio = eyeCenter && philtrum && pitchBase > 0
+    ? (philtrum.y - eyeCenter.y) / pitchBase
+    : 0;
+  const pitchEvaluated = Boolean(eyeCenter && noseCenter && chin && philtrum && pitchBase > 0);
+  const pitchOk = !pitchEvaluated || (
+    nosePitchRatio >= MIN_HEAD_PITCH_NOSE_RATIO
+    && nosePitchRatio <= MAX_HEAD_PITCH_NOSE_RATIO
+    && philtrumPitchRatio >= MIN_HEAD_PITCH_PHILTRUM_RATIO
+    && philtrumPitchRatio <= MAX_HEAD_PITCH_PHILTRUM_RATIO
+  );
+
+  return {
+    yawOk,
+    pitchOk,
+    noseOffsetRatio,
+    eyeWidthAsymmetry,
+    nosePitchRatio,
+    philtrumPitchRatio,
+  };
 };
 
 export const validateLandmarkFrame = (
@@ -689,6 +894,10 @@ export const buildFaceAlignment = (landmarks: FacePoint[]): FaceAlignment => {
       distanceState: 'unknown',
       horizontalDirection: 'center',
       verticalDirection: 'center',
+      gazeOk: false,
+      gazeDirection: 'unknown',
+      gazeVerticalDirection: 'unknown',
+      gazeOffset: 0,
       ready: false,
     };
   }
@@ -720,9 +929,12 @@ export const buildFaceAlignment = (landmarks: FacePoint[]): FaceAlignment => {
 
   const centered = horizontalDirection === 'center' && verticalDirection === 'center';
   const distanceOk = distanceState === 'ok' && faceWidth >= MIN_FACE_WIDTH;
-  const pitchOk = faceHeight >= MIN_PITCH_HEIGHT;
-  const yawOk = Math.abs(eyeTilt) <= MAX_EYE_TILT;
-  const ready = centered && distanceOk && pitchOk && yawOk;
+  const rollOk = Math.abs(eyeTilt) <= MAX_EYE_TILT;
+  const headPoseAlignment = buildHeadPoseAlignment(landmarks, faceCenterX, faceWidth);
+  const pitchOk = faceHeight >= MIN_PITCH_HEIGHT && headPoseAlignment.pitchOk;
+  const yawOk = rollOk && headPoseAlignment.yawOk;
+  const gazeAlignment = buildGazeAlignment(landmarks);
+  const ready = centered && distanceOk && pitchOk && yawOk && Boolean(gazeAlignment.gazeOk);
 
   let guidance = '정면 위치가 안정적입니다';
   if (horizontalDirection === 'left') guidance = '얼굴을 오른쪽으로 조금 이동해주세요';
@@ -731,9 +943,19 @@ export const buildFaceAlignment = (landmarks: FacePoint[]): FaceAlignment => {
   else if (verticalDirection === 'down') guidance = '얼굴을 위로 조금 올려주세요';
   else if (distanceState === 'too_far' || faceWidth < MIN_FACE_WIDTH) guidance = '가이드 라인에 맞게 조금 가까이 와주세요';
   else if (distanceState === 'too_close') guidance = '가이드 라인에 맞게 조금 멀어져 주세요';
-  else if (!yawOk) guidance = '고개를 기울이지 말고 정면을 바라봐 주세요';
+  else if (!rollOk) guidance = '고개를 기울이지 말고 정면을 바라봐 주세요';
+  else if (!headPoseAlignment.yawOk) guidance = '얼굴을 돌리지 말고 정면을 바라봐 주세요';
+  else if (!pitchOk) guidance = '고개를 들거나 숙이지 말고 정면을 바라봐 주세요';
+  else if (!gazeAlignment.gazeOk) guidance = '카메라 렌즈를 정면으로 바라봐 주세요';
 
-  const checks = [centered, distanceOk, pitchOk, yawOk].filter(Boolean).length;
+  const checkResults = [
+    centered,
+    distanceOk,
+    pitchOk,
+    yawOk,
+    ...(gazeAlignment.evaluated ? [Boolean(gazeAlignment.gazeOk)] : []),
+  ];
+  const checks = checkResults.filter(Boolean).length;
 
   return {
     detected: true,
@@ -741,8 +963,9 @@ export const buildFaceAlignment = (landmarks: FacePoint[]): FaceAlignment => {
     distanceOk,
     pitchOk,
     yawOk,
+    gazeOk: gazeAlignment.gazeOk,
     guidance,
-    confidence: checks / 4,
+    confidence: checks / checkResults.length,
     offsetX,
     offsetY,
     faceHeightRatio: faceHeight,
@@ -751,6 +974,9 @@ export const buildFaceAlignment = (landmarks: FacePoint[]): FaceAlignment => {
     distanceState,
     horizontalDirection,
     verticalDirection,
+    gazeDirection: gazeAlignment.gazeDirection,
+    gazeVerticalDirection: gazeAlignment.gazeVerticalDirection,
+    gazeOffset: gazeAlignment.gazeOffset,
     ready,
   };
 };
