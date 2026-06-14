@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import type { RefObject } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CAMERA_PERMISSION_COPY } from '../../../constants';
 import type { CameraPermissionState } from '../../../types';
 import type {
@@ -24,6 +24,7 @@ import { FaceGuidance, type TrackerStatus } from './FaceGuidance';
 interface CameraPreviewProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
+  previewFrameRef?: RefObject<HTMLDivElement | null>;
   cameraPermission: CameraPermissionState;
   trackerStatus: TrackerStatus;
   alignment: FaceAlignment;
@@ -63,6 +64,7 @@ interface PreviewGuideLines {
 export const CameraPreview = ({
   videoRef,
   canvasRef,
+  previewFrameRef: externalPreviewFrameRef,
   cameraPermission,
   trackerStatus,
   alignment,
@@ -79,7 +81,8 @@ export const CameraPreview = ({
   guidanceMode = 'capture',
 }: CameraPreviewProps) => {
   const permissionCopy = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_COPY[cameraPermission];
-  const previewFrameRef = useRef<HTMLDivElement>(null);
+  const internalPreviewFrameRef = useRef<HTMLDivElement>(null);
+  const previewFrameRef = externalPreviewFrameRef ?? internalPreviewFrameRef;
   const arOverlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [overlayRevision, setOverlayRevision] = useState(0);
   const canShowLiveOverlay = cameraPermission === 'granted'
@@ -87,30 +90,30 @@ export const CameraPreview = ({
     && Boolean(selectedRecommendation)
     && Boolean(liveOverlayAnchors);
 
-  const syncArOverlaySize = useCallback(() => {
-    const frame = previewFrameRef.current;
-    const canvas = arOverlayCanvasRef.current;
-
-    if (!frame || !canvas) return;
-
-    const { width, height } = frame.getBoundingClientRect();
-    if (!width || !height) return;
-
-    const pixelRatio = window.devicePixelRatio || 1;
-    const nextWidth = Math.round(width * pixelRatio);
-    const nextHeight = Math.round(height * pixelRatio);
-
-    const changed = canvas.width !== nextWidth || canvas.height !== nextHeight;
-    if (canvas.width !== nextWidth) canvas.width = nextWidth;
-    if (canvas.height !== nextHeight) canvas.height = nextHeight;
-
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    if (changed) setOverlayRevision((revision) => revision + 1);
-  }, []);
-
   useEffect(() => {
     if (cameraPermission !== 'granted') return;
+
+    const syncArOverlaySize = () => {
+      const frame = previewFrameRef.current;
+      const canvas = arOverlayCanvasRef.current;
+
+      if (!frame || !canvas) return;
+
+      const { width, height } = frame.getBoundingClientRect();
+      if (!width || !height) return;
+
+      const pixelRatio = window.devicePixelRatio || 1;
+      const nextWidth = Math.round(width * pixelRatio);
+      const nextHeight = Math.round(height * pixelRatio);
+
+      const changed = canvas.width !== nextWidth || canvas.height !== nextHeight;
+      if (canvas.width !== nextWidth) canvas.width = nextWidth;
+      if (canvas.height !== nextHeight) canvas.height = nextHeight;
+
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      if (changed) setOverlayRevision((revision) => revision + 1);
+    };
 
     syncArOverlaySize();
 
@@ -133,7 +136,7 @@ export const CameraPreview = ({
       window.removeEventListener('resize', syncArOverlaySize);
       window.removeEventListener('orientationchange', syncArOverlaySize);
     };
-  }, [cameraPermission, syncArOverlaySize, videoRef]);
+  }, [cameraPermission, previewFrameRef, videoRef]);
 
   useEffect(() => {
     const frame = previewFrameRef.current;
@@ -335,7 +338,7 @@ export const CameraPreview = ({
     drawCenterPath(left, recommendationGeometry.mode);
     drawCenterPath(right, recommendationGeometry.mode);
     context.restore();
-  }, [alignment.ready, cameraPermission, liveOverlayAnchors, overlayRevision, selectedRecommendation, videoRef]);
+  }, [alignment.ready, cameraPermission, liveOverlayAnchors, overlayRevision, previewFrameRef, selectedRecommendation, videoRef]);
 
   return (
     <>

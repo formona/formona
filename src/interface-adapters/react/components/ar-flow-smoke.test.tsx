@@ -483,12 +483,32 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(onAnalysisComplete).toHaveBeenCalledWith('data:image/jpeg;base64,monabrow', analysis);
   });
 
-  it('captures the visible object-cover crop from the live camera preview', () => {
+  it('captures the visible preview crop when the mobile video layout size is unavailable', () => {
     vi.useFakeTimers();
     vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1920);
     vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1080);
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
-    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(640);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function getClientWidth(this: HTMLElement) {
+      return this.tagName === 'VIDEO' ? 0 : 390;
+    });
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function getClientHeight(this: HTMLElement) {
+      return this.tagName === 'VIDEO' ? 0 : 640;
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+      const width = this.tagName === 'VIDEO' ? 0 : 390;
+      const height = this.tagName === 'VIDEO' ? 0 : 640;
+
+      return {
+        width,
+        height,
+        x: 0,
+        y: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+        left: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
     const analysis = makeAnalysis();
     const { onAnalysisComplete, rerender } = renderCapturePage();
 
