@@ -115,7 +115,7 @@ export function ResultPage({
                 width={330}
                 height={310}
                 unoptimized
-                className="h-full w-full object-cover object-top"
+                className="h-full w-full object-contain object-center"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-main-brown/35">
