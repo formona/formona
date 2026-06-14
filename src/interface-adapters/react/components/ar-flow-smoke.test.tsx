@@ -483,6 +483,42 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(onAnalysisComplete).toHaveBeenCalledWith('data:image/jpeg;base64,monabrow', analysis);
   });
 
+  it('captures the visible object-cover crop from the live camera preview', () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1920);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1080);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(640);
+    const analysis = makeAnalysis();
+    const { onAnalysisComplete, rerender } = renderCapturePage();
+
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      detectedFaceShape: FaceShape.OVAL,
+      alignment: readyAlignment,
+      analysis,
+    };
+    rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
+
+    act(() => {
+      vi.advanceTimersByTime(APP_TIMING_MS.recognitionHold);
+    });
+
+    const drawImageArgs = vi.mocked(canvasContextMock.drawImage).mock.calls.at(-1);
+
+    expect(drawImageArgs?.[0]).toBeInstanceOf(HTMLVideoElement);
+    expect(drawImageArgs?.[1] as number).toBeCloseTo(630.94, 2);
+    expect(drawImageArgs?.[2] as number).toBe(0);
+    expect(drawImageArgs?.[3] as number).toBeCloseTo(658.13, 2);
+    expect(drawImageArgs?.[4] as number).toBe(1080);
+    expect(drawImageArgs?.[5] as number).toBe(0);
+    expect(drawImageArgs?.[6] as number).toBe(0);
+    expect(drawImageArgs?.[7] as number).toBe(658);
+    expect(drawImageArgs?.[8] as number).toBe(1080);
+  });
+
   it('mounts a mirrored AR overlay canvas over the live camera frame and resizes it to the viewport box', async () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       width: 390,
@@ -926,7 +962,11 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
       />,
     );
 
-    expect(screen.getByAltText('분석 촬영 이미지')).toBeInTheDocument();
+    const resultImage = screen.getByAltText('분석 촬영 이미지');
+
+    expect(resultImage).toBeInTheDocument();
+    expect(resultImage).toHaveClass('object-contain');
+    expect(resultImage).not.toHaveClass('object-cover');
     expect(container.querySelector('video')).not.toBeInTheDocument();
     expect(screen.queryByTestId('camera-ar-overlay')).not.toBeInTheDocument();
     expect(screen.queryByText('LIVE AR')).not.toBeInTheDocument();

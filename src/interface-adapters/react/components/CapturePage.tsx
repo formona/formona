@@ -81,16 +81,41 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysis
     const video = videoRef.current;
     if (video.videoWidth <= 0 || video.videoHeight <= 0) return null;
 
+    const previewRect = video.getBoundingClientRect();
+    const previewWidth = video.clientWidth || previewRect.width;
+    const previewHeight = video.clientHeight || previewRect.height;
+    const hasPreviewSize = previewWidth > 0 && previewHeight > 0;
+    const coverScale = hasPreviewSize
+      ? Math.max(previewWidth / video.videoWidth, previewHeight / video.videoHeight)
+      : 1;
+    const sourceWidth = hasPreviewSize
+      ? Math.min(video.videoWidth, previewWidth / coverScale)
+      : video.videoWidth;
+    const sourceHeight = hasPreviewSize
+      ? Math.min(video.videoHeight, previewHeight / coverScale)
+      : video.videoHeight;
+    const sourceX = Math.max(0, (video.videoWidth - sourceWidth) / 2);
+    const sourceY = Math.max(0, (video.videoHeight - sourceHeight) / 2);
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = Math.max(1, Math.round(sourceWidth));
+    canvas.height = Math.max(1, Math.round(sourceHeight));
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
     ctx.save();
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      video,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
     ctx.restore();
 
     return canvas.toDataURL('image/jpeg');
