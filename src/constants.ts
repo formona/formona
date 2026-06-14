@@ -45,6 +45,13 @@ export const ADMIN_DEMO_AUTH_CONFIG = {
   sessionStorageKey: 'formona_admin_demo_passcode',
 } as const;
 
+export const normalizeAdminPasscode = (value: string) => (
+  value
+    .trim()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-')
+    .replace(/\s*-\s*/g, '-')
+);
+
 export const FRONT_CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
   video: {

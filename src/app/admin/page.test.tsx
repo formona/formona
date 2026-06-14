@@ -104,6 +104,16 @@ describe('AdminPage', () => {
     expect(screen.queryByRole('heading', { name: '주문 및 측정 정보' })).not.toBeInTheDocument();
   });
 
+  it('does not show an incorrect passcode error for a stale stored session', async () => {
+    sessionStorage.setItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey, 'stale-passcode');
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole('heading', { name: '관리자 접근' })).toBeInTheDocument();
+    expect(screen.queryByText('비밀번호가 올바르지 않습니다.')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey)).toBeNull();
+  });
+
   it('toggles passcode visibility from the admin login form', async () => {
     render(<AdminPage />);
 
@@ -122,7 +132,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
 
     fireEvent.change(await screen.findByLabelText('비밀번호'), {
-      target: { value: ADMIN_DEMO_AUTH_CONFIG.defaultPasscode },
+      target: { value: ' formona – demo ' },
     });
     fireEvent.click(screen.getByRole('button', { name: '접속' }));
 

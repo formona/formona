@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { ADMIN_DEMO_AUTH_CONFIG } from '../../../../constants';
+import { ADMIN_DEMO_AUTH_CONFIG, normalizeAdminPasscode } from '../../../../constants';
 import { listMeasurementRecords } from '../../../../infrastructure/database/measurement-records';
 
 export const runtime = 'nodejs';
@@ -14,8 +14,8 @@ const getExpectedAdminPasscode = () => (
 );
 
 const isAuthorized = (request: Request) => {
-  const submittedPasscode = request.headers.get(ADMIN_PASSCODE_HEADER)?.trim();
-  return Boolean(submittedPasscode) && submittedPasscode === getExpectedAdminPasscode();
+  const submittedPasscode = normalizeAdminPasscode(request.headers.get(ADMIN_PASSCODE_HEADER) ?? '');
+  return Boolean(submittedPasscode) && submittedPasscode === normalizeAdminPasscode(getExpectedAdminPasscode());
 };
 
 export async function GET(request: Request) {

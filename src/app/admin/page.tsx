@@ -7,7 +7,7 @@ import {
   type StoredOrderRecord,
 } from '../../domain/order-records';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../domain/measurement-copy';
-import { ADMIN_DEMO_AUTH_CONFIG } from '../../constants';
+import { ADMIN_DEMO_AUTH_CONFIG, normalizeAdminPasscode } from '../../constants';
 
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
@@ -125,11 +125,11 @@ export default function AdminPage() {
   }, []);
 
   const loadRecords = useCallback(async (adminPasscode: string, persistPasscode = false) => {
-    const nextPasscode = adminPasscode.trim();
+    const nextPasscode = normalizeAdminPasscode(adminPasscode);
 
     if (!nextPasscode) {
       setAuthStatus('locked');
-      setAuthError('비밀번호를 입력해주세요.');
+      setAuthError(persistPasscode ? '비밀번호를 입력해주세요.' : '');
       return false;
     }
 
@@ -149,7 +149,7 @@ export default function AdminPage() {
         sessionStorage.removeItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey);
         applyRecords([]);
         setAuthStatus('locked');
-        setAuthError('비밀번호가 올바르지 않습니다.');
+        setAuthError(persistPasscode ? '비밀번호가 올바르지 않습니다.' : '');
         return false;
       }
 
