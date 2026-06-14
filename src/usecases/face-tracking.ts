@@ -69,11 +69,15 @@ export const EMPTY_ALIGNMENT: FaceAlignment = {
   distanceOk: false,
   pitchOk: false,
   yawOk: false,
+  gazeOk: false,
   guidance: '가이드 라인에 맞춰주세요',
   confidence: 0,
   distanceState: 'unknown',
   horizontalDirection: 'center',
   verticalDirection: 'center',
+  gazeDirection: 'unknown',
+  gazeVerticalDirection: 'unknown',
+  gazeOffset: 0,
   ready: false,
 };
 
@@ -108,7 +112,7 @@ export const buildFaceTrackingFrameState = ({
     ? buildEyebrowOverlayAnchorPoints(analysisLandmarks)
     : null;
   const nextAlignment = frameValidation.valid && featureLandmarks?.hasCoreFaceMesh
-    ? buildFaceAlignment(featureLandmarks.coreLandmarks)
+    ? buildFaceAlignment(analysisLandmarks.length ? analysisLandmarks : featureLandmarks.coreLandmarks)
     : buildInvalidFrameAlignment(
       nextFrameGuidance?.message ?? EMPTY_ALIGNMENT.guidance,
       frameValidation.reason !== 'missing_face',

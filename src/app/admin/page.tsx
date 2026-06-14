@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Download, Eye, EyeOff, LockKeyhole, LogOut, RefreshCw } from 'lucide-react';
 import {
-  parseMeasurementRecords,
-  type StoredMeasurementRecord,
-} from '../../domain/measurement-records';
+  parseOrderRecords,
+  type StoredOrderRecord,
+} from '../../domain/order-records';
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../domain/measurement-copy';
-import { ADMIN_DEMO_AUTH_CONFIG } from '../../constants';
+import { ADMIN_DEMO_AUTH_CONFIG, normalizeAdminPasscode } from '../../constants';
 
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
@@ -46,15 +46,22 @@ const ADMIN_PASSCODE_HEADER = 'x-formona-admin-passcode';
 const parseRecordsResponse = (value: unknown) => {
   if (!value || typeof value !== 'object' || !('records' in value)) return [];
 
-  return parseMeasurementRecords(JSON.stringify((value as { records: unknown }).records));
+  return parseOrderRecords(JSON.stringify((value as { records: unknown }).records));
 };
 
-const buildRecordsCsv = (records: StoredMeasurementRecord[]) => {
+const buildRecordsCsv = (records: StoredOrderRecord[]) => {
   const metricHeaders = EYEBROW_METRIC_DISPLAY_ROWS.map((row) => `${row.label}(mm)`);
   const headers = [
-    'recordId',
-    'savedAtIso',
+    'orderId',
+    'orderedAtIso',
+    'measurementRecordId',
     'measuredAtIso',
+    'recipient',
+    'phone',
+    'postalCode',
+    'baseAddress',
+    'detailAddress',
+    'deliveryMemo',
     'faceShape',
     'selectedStyle',
     'ipdMm',
@@ -65,20 +72,29 @@ const buildRecordsCsv = (records: StoredMeasurementRecord[]) => {
   ];
 
   const rows = records.map((record) => {
+    const measurement = record.payload.measurement;
+    const shippingAddress = record.payload.shippingAddress;
     const metricValues = EYEBROW_METRIC_DISPLAY_ROWS.map((row) => (
-      record.payload.metrics.find((metric) => metric.key === row.key)?.valueMm ?? ''
+      measurement.metrics.find((metric) => metric.key === row.key)?.valueMm ?? ''
     ));
 
     return [
       record.id,
-      record.savedAtIso,
-      record.payload.measuredAtIso,
-      record.payload.faceShape,
-      record.payload.selectedStyle?.name ?? '',
-      record.payload.ipdMm,
-      record.payload.quality.reportable,
-      record.payload.quality.overallConfidence ?? '',
-      record.payload.quality.maxEstimatedErrorMm ?? '',
+      record.orderedAtIso,
+      record.measurementRecordId,
+      measurement.measuredAtIso,
+      shippingAddress.recipient,
+      shippingAddress.phone,
+      shippingAddress.postalCode,
+      shippingAddress.baseAddress,
+      shippingAddress.detailAddress,
+      shippingAddress.deliveryMemo,
+      measurement.faceShape,
+      measurement.selectedStyle?.name ?? '',
+      measurement.ipdMm,
+      measurement.quality.reportable,
+      measurement.quality.overallConfidence ?? '',
+      measurement.quality.maxEstimatedErrorMm ?? '',
       ...metricValues,
     ];
   });
@@ -96,10 +112,10 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState('');
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState<string | null>(null);
-  const [records, setRecords] = useState<StoredMeasurementRecord[]>([]);
+  const [records, setRecords] = useState<StoredOrderRecord[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
-  const applyRecords = useCallback((nextRecords: StoredMeasurementRecord[]) => {
+  const applyRecords = useCallback((nextRecords: StoredOrderRecord[]) => {
     setRecords(nextRecords);
     setSelectedRecordId((currentId) => (
       currentId && nextRecords.some((record) => record.id === currentId)
@@ -109,11 +125,11 @@ export default function AdminPage() {
   }, []);
 
   const loadRecords = useCallback(async (adminPasscode: string, persistPasscode = false) => {
-    const nextPasscode = adminPasscode.trim();
+    const nextPasscode = normalizeAdminPasscode(adminPasscode);
 
     if (!nextPasscode) {
       setAuthStatus('locked');
-      setAuthError('비밀번호를 입력해주세요.');
+      setAuthError(persistPasscode ? '비밀번호를 입력해주세요.' : '');
       return false;
     }
 
@@ -121,7 +137,7 @@ export default function AdminPage() {
     setRecordsError(null);
 
     try {
-      const response = await fetch('/api/admin/measurements', {
+      const response = await fetch('/api/admin/orders', {
         method: 'GET',
         headers: {
           [ADMIN_PASSCODE_HEADER]: nextPasscode,
@@ -133,12 +149,12 @@ export default function AdminPage() {
         sessionStorage.removeItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey);
         applyRecords([]);
         setAuthStatus('locked');
-        setAuthError('비밀번호가 올바르지 않습니다.');
+        setAuthError(persistPasscode ? '비밀번호가 올바르지 않습니다.' : '');
         return false;
       }
 
       if (!response.ok) {
-        throw new Error(`Admin measurements request failed: ${response.status}`);
+        throw new Error(`Admin orders request failed: ${response.status}`);
       }
 
       const nextRecords = parseRecordsResponse(await response.json());
@@ -153,7 +169,7 @@ export default function AdminPage() {
       applyRecords(nextRecords);
       return true;
     } catch {
-      setRecordsError('측정 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setRecordsError('주문 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
       setAuthStatus((currentStatus) => (currentStatus === 'checking' ? 'locked' : currentStatus));
       return false;
     } finally {
@@ -186,12 +202,12 @@ export default function AdminPage() {
   const selectedRecord = useMemo(() => (
     records.find((record) => record.id === selectedRecordId) ?? records[0] ?? null
   ), [records, selectedRecordId]);
-  const reportableCount = records.filter((record) => record.payload.quality.reportable).length;
+  const reportableCount = records.filter((record) => record.payload.measurement.quality.reportable).length;
   const latestRecord = records[0] ?? null;
 
   const handleDownloadJson = () => {
     downloadTextFile(
-      `formona-measurements-${Date.now()}.json`,
+      `formona-orders-${Date.now()}.json`,
       JSON.stringify(records, null, 2),
       'application/json;charset=utf-8',
     );
@@ -199,7 +215,7 @@ export default function AdminPage() {
 
   const handleDownloadCsv = () => {
     downloadTextFile(
-      `formona-measurements-${Date.now()}.csv`,
+      `formona-orders-${Date.now()}.csv`,
       buildRecordsCsv(records),
       'text/csv;charset=utf-8',
     );
@@ -234,7 +250,7 @@ export default function AdminPage() {
           <p className="mt-5 text-[11px] font-bold text-main-brown/55">FORMONA ADMIN</p>
           <h1 className="mt-2 text-2xl font-bold leading-tight">관리자 접근</h1>
           <p className="mt-2 text-sm leading-relaxed text-sub-gray">
-            측정 수치 확인을 위해 관리자 비밀번호를 입력해주세요.
+            주문과 배송지 확인을 위해 관리자 비밀번호를 입력해주세요.
           </p>
 
           <label htmlFor="admin-passcode" className="mt-6 block text-xs font-bold text-sub-gray">
@@ -289,9 +305,9 @@ export default function AdminPage() {
         <header className="flex flex-col gap-4 border-b border-main-brown/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-bold text-main-brown/55">FORMONA ADMIN</p>
-            <h1 className="mt-2 text-2xl font-bold leading-tight">사용자 측정 수치</h1>
+            <h1 className="mt-2 text-2xl font-bold leading-tight">주문 및 측정 정보</h1>
             <p className="mt-2 text-sm leading-relaxed text-sub-gray">
-              저장된 얼굴형 분석과 눈썹 기준 수치를 제형틀 제작용으로 확인합니다.
+              주문 완료된 배송지와 얼굴형 분석, 눈썹 기준 수치를 함께 확인합니다.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -320,33 +336,33 @@ export default function AdminPage() {
           </section>
         )}
 
-        <section className="grid gap-3 sm:grid-cols-3" aria-label="측정 기록 요약">
+        <section className="grid gap-3 sm:grid-cols-3" aria-label="주문 기록 요약">
           <div className="rounded-lg border border-main-brown/10 bg-main-brown/[0.03] p-4">
-            <p className="text-xs font-bold text-sub-gray">총 측정 건수</p>
+            <p className="text-xs font-bold text-sub-gray">총 주문 건수</p>
             <p className="mt-2 text-3xl font-bold tabular-nums">{records.length}</p>
           </div>
           <div className="rounded-lg border border-main-brown/10 bg-main-brown/[0.03] p-4">
-            <p className="text-xs font-bold text-sub-gray">제작 가능 품질</p>
+            <p className="text-xs font-bold text-sub-gray">제작 가능 주문</p>
             <p className="mt-2 text-3xl font-bold tabular-nums">{reportableCount}</p>
           </div>
           <div className="rounded-lg border border-main-brown/10 bg-main-brown/[0.03] p-4">
-            <p className="text-xs font-bold text-sub-gray">최근 측정</p>
-            <p className="mt-2 text-sm font-bold">{latestRecord ? formatDateTime(latestRecord.savedAtIso) : '-'}</p>
+            <p className="text-xs font-bold text-sub-gray">최근 주문</p>
+            <p className="mt-2 text-sm font-bold">{latestRecord ? formatDateTime(latestRecord.orderedAtIso) : '-'}</p>
           </div>
         </section>
 
         {records.length === 0 ? (
           <section className="rounded-lg border border-main-brown/10 bg-white p-8 text-center">
-            <h2 className="text-lg font-bold">저장된 측정 기록이 없습니다</h2>
+            <h2 className="text-lg font-bold">저장된 주문 기록이 없습니다</h2>
             <p className="mt-2 text-sm leading-relaxed text-sub-gray">
-              앱에서 얼굴 분석을 완료하면 DB에 저장된 측정값이 이 관리자 화면에 표시됩니다.
+              앱에서 주문 완료를 누르면 DB에 저장된 주문과 측정값이 이 관리자 화면에 표시됩니다.
             </p>
           </section>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
             <section className="overflow-hidden rounded-lg border border-main-brown/10 bg-white" aria-labelledby="record-list-heading">
               <div className="flex items-center justify-between border-b border-main-brown/10 px-4 py-3">
-                <h2 id="record-list-heading" className="text-sm font-bold">측정 목록</h2>
+                <h2 id="record-list-heading" className="text-sm font-bold">주문 목록</h2>
                 <span className="text-xs font-bold text-sub-gray">최신순</span>
               </div>
               <div className="max-h-[560px] overflow-y-auto">
@@ -356,21 +372,21 @@ export default function AdminPage() {
                     type="button"
                     onClick={() => setSelectedRecordId(record.id)}
                     className={[
-                      'grid w-full grid-cols-[72px_minmax(0,1fr)_92px] items-center gap-3 border-b border-main-brown/10 px-4 py-3 text-left last:border-0',
+                      'grid w-full grid-cols-[72px_minmax(0,1fr)_104px] items-center gap-3 border-b border-main-brown/10 px-4 py-3 text-left last:border-0',
                       selectedRecord?.id === record.id ? 'bg-main-brown/[0.04]' : 'bg-white',
                     ].join(' ')}
                   >
                     <span className="text-xs font-bold text-main-brown">#{String(records.length - index).padStart(3, '0')}</span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold">{record.payload.faceShape}</span>
+                      <span className="block truncate text-sm font-bold">{record.payload.shippingAddress.recipient}</span>
                       <span className="mt-1 block truncate text-xs text-sub-gray">
-                        {record.payload.selectedStyle?.name ?? '추천 스타일 없음'} · {formatDateTime(record.payload.measuredAtIso)}
+                        {record.payload.measurement.selectedStyle?.name ?? '추천 스타일 없음'} · {formatDateTime(record.orderedAtIso)}
                       </span>
                     </span>
                     <span className="text-right">
-                      <span className="block text-sm font-bold tabular-nums">{record.payload.ipdMm.toFixed(1)}mm</span>
+                      <span className="block truncate text-sm font-bold">{record.payload.measurement.faceShape}</span>
                       <span className="mt-1 block text-[10px] font-bold text-sub-gray">
-                        {record.payload.quality.reportable ? '제작 가능' : '검토 필요'}
+                        {record.payload.measurement.quality.reportable ? '제작 가능' : '검토 필요'}
                       </span>
                     </span>
                   </button>
@@ -381,25 +397,45 @@ export default function AdminPage() {
             {selectedRecord && (
               <section className="space-y-4" aria-labelledby="record-detail-heading">
                 <div className="rounded-lg border border-main-brown/10 bg-white p-5">
-                  <p className="text-[11px] font-bold text-main-brown/55">선택 기록</p>
-                  <h2 id="record-detail-heading" className="mt-2 text-xl font-bold">{selectedRecord.payload.faceShape}</h2>
-                  <p className="mt-1 text-sm text-sub-gray">{selectedRecord.payload.selectedStyle?.name ?? '추천 스타일 없음'}</p>
+                  <p className="text-[11px] font-bold text-main-brown/55">선택 주문</p>
+                  <h2 id="record-detail-heading" className="mt-2 text-xl font-bold">{selectedRecord.payload.shippingAddress.recipient}</h2>
+                  <p className="mt-1 text-sm text-sub-gray">
+                    {selectedRecord.payload.measurement.selectedStyle?.name ?? '추천 스타일 없음'} · {selectedRecord.payload.measurement.faceShape}
+                  </p>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                     <div className="rounded-lg bg-main-brown/[0.03] p-3">
-                      <p className="text-[11px] font-bold text-sub-gray">측정 시각</p>
-                      <p className="mt-1 font-bold">{formatDateTime(selectedRecord.payload.measuredAtIso)}</p>
+                      <p className="text-[11px] font-bold text-sub-gray">주문 시각</p>
+                      <p className="mt-1 font-bold">{formatDateTime(selectedRecord.orderedAtIso)}</p>
                     </div>
                     <div className="rounded-lg bg-main-brown/[0.03] p-3">
                       <p className="text-[11px] font-bold text-sub-gray">품질</p>
-                      <p className="mt-1 font-bold">{selectedRecord.payload.quality.reportable ? '제작 가능' : '검토 필요'}</p>
+                      <p className="mt-1 font-bold">{selectedRecord.payload.measurement.quality.reportable ? '제작 가능' : '검토 필요'}</p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-main-brown/10 bg-white p-5">
+                  <h3 className="text-sm font-bold">배송지 정보</h3>
+                  <div className="mt-4 space-y-2 text-sm">
+                    {[
+                      ['연락처', selectedRecord.payload.shippingAddress.phone],
+                      ['우편번호', selectedRecord.payload.shippingAddress.postalCode],
+                      ['기본 주소', selectedRecord.payload.shippingAddress.baseAddress],
+                      ['상세 주소', selectedRecord.payload.shippingAddress.detailAddress],
+                      ['배송 메모', selectedRecord.payload.shippingAddress.deliveryMemo],
+                    ].map(([label, value]) => (
+                      <div key={label} className="grid grid-cols-[76px_minmax(0,1fr)] gap-3 rounded-lg bg-main-brown/[0.03] px-3 py-2">
+                        <span className="font-bold text-sub-gray">{label}</span>
+                        <span className="break-keep font-bold">{value || '-'}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 <div className="rounded-lg border border-main-brown/10 bg-white p-5">
                   <h3 className="text-sm font-bold">눈썹 기준 수치</h3>
                   <div className="mt-4 grid grid-cols-2 gap-2">
-                    {selectedRecord.payload.metrics.map((metric) => (
+                    {selectedRecord.payload.measurement.metrics.map((metric) => (
                       <div key={metric.key} className="rounded-lg bg-main-brown/[0.03] p-3">
                         <p className="text-[11px] font-bold leading-tight text-sub-gray">{metric.label}</p>
                         <p className="mt-2 text-xl font-bold tabular-nums">{metric.displayValue}</p>
@@ -415,12 +451,12 @@ export default function AdminPage() {
                   <h3 className="text-sm font-bold">제형틀 가이드 평균</h3>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                     {[
-                      ['SP 라인', selectedRecord.payload.goldenRatioGuides.average.spLineMm],
-                      ['HP 라인', selectedRecord.payload.goldenRatioGuides.average.hpLineMm],
-                      ['EP 라인', selectedRecord.payload.goldenRatioGuides.average.epLineMm],
-                      ['SP~HP', selectedRecord.payload.goldenRatioGuides.average.spToHpMm],
-                      ['HP~EP', selectedRecord.payload.goldenRatioGuides.average.hpToEpMm],
-                      ['HP 높이', selectedRecord.payload.goldenRatioGuides.average.hpHeightMm],
+                      ['SP 라인', selectedRecord.payload.measurement.goldenRatioGuides.average.spLineMm],
+                      ['HP 라인', selectedRecord.payload.measurement.goldenRatioGuides.average.hpLineMm],
+                      ['EP 라인', selectedRecord.payload.measurement.goldenRatioGuides.average.epLineMm],
+                      ['SP~HP', selectedRecord.payload.measurement.goldenRatioGuides.average.spToHpMm],
+                      ['HP~EP', selectedRecord.payload.measurement.goldenRatioGuides.average.hpToEpMm],
+                      ['HP 높이', selectedRecord.payload.measurement.goldenRatioGuides.average.hpHeightMm],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between rounded-lg bg-main-brown/[0.03] px-3 py-2">
                         <span className="font-bold text-sub-gray">{label}</span>

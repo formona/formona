@@ -47,6 +47,26 @@ const makeFaceMeshLandmarks = () => {
   return landmarks;
 };
 
+const makeFaceMeshLandmarksWithIris = (overrides: Record<number, FacePoint> = {}) => {
+  const landmarks = makeFaceMeshLandmarks();
+
+  Object.assign(landmarks, {
+    468: point(0.4, 0.43),
+    469: point(0.4, 0.428),
+    470: point(0.402, 0.43),
+    471: point(0.4, 0.432),
+    472: point(0.398, 0.43),
+    473: point(0.6, 0.43),
+    474: point(0.6, 0.428),
+    475: point(0.602, 0.43),
+    476: point(0.6, 0.432),
+    477: point(0.598, 0.43),
+    ...overrides,
+  });
+
+  return landmarks;
+};
+
 const createPorts = () => {
   const measurementStabilizer: MeasurementStabilizerPort = {
     filter: vi.fn((analysis) => analysis),
@@ -85,6 +105,45 @@ describe('face tracking usecase orchestration', () => {
     expect(ports.measurementStabilizer.filter).toHaveBeenCalledWith(result.state.analysis, 1000);
     expect(ports.liveTrackingSmoother.filter).toHaveBeenCalledWith(
       expect.objectContaining({ landmarks: expect.any(Array) }),
+      1000,
+    );
+  });
+
+  it('uses raw iris landmarks to block live capture when the user is not looking at the lens', () => {
+    const ports = createPorts();
+    const landmarks = makeFaceMeshLandmarksWithIris({
+      468: point(0.414, 0.43),
+      469: point(0.414, 0.428),
+      470: point(0.416, 0.43),
+      471: point(0.414, 0.432),
+      472: point(0.412, 0.43),
+      473: point(0.654, 0.43),
+      474: point(0.654, 0.428),
+      475: point(0.656, 0.43),
+      476: point(0.654, 0.432),
+      477: point(0.652, 0.43),
+    });
+
+    const result = buildFaceTrackingFrameState({
+      detectedLandmarks: landmarks,
+      ipdMm: 63,
+      timestampMs: 1000,
+      videoDimensions: { width: 1080, height: 1920 },
+      lastValidFrame: null,
+      ...ports,
+    });
+
+    expect(result.state.alignment).toMatchObject({
+      gazeOk: false,
+      gazeDirection: 'right',
+      guidance: '카메라 렌즈를 정면으로 바라봐 주세요',
+      ready: false,
+    });
+    expect(result.state.analysis?.alignment.ready).toBe(false);
+    expect(ports.measurementStabilizer.filter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alignment: expect.objectContaining({ ready: false, gazeOk: false }),
+      }),
       1000,
     );
   });

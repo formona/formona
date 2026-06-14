@@ -2,17 +2,16 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertCircle, Camera, Loader2, Settings } from 'lucide-react';
+import { AlertCircle, Camera, ChevronLeft, Loader2, Settings } from 'lucide-react';
 import { cn } from '../utils';
 import { useFaceMeshTracker } from '../hooks/useFaceMeshTracker';
 import { CameraPreview } from './CameraPreview';
 import { Controls } from './Controls';
+import { FlowProgress } from './FlowProgress';
 import type { CameraPermissionState, FaceAnalysisResult } from '../../../types';
 import { buildEyebrowRecommendationState } from '../../../usecases/eyebrow-recommendations';
 import { EYEBROW_METRIC_DISPLAY_KEYS } from '../../../domain/measurement-copy';
 import { APP_TIMING_MS, FEATURE_FLAGS } from '../../../constants';
-
-const AUTO_ANALYSIS_DELAY_MS = 650;
 
 const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>, React.ComponentType<{ size?: number; className?: string }>> = {
   idle: Camera,
@@ -24,11 +23,13 @@ const CAMERA_PERMISSION_ICONS: Record<Exclude<CameraPermissionState, 'granted'>,
 interface CapturePageProps {
   ipdMm: number;
   autoStartCamera?: boolean;
+  onBack?: () => void;
   onAnalysisComplete: (capturedImage: string, analysis: FaceAnalysisResult) => void;
 }
 
-const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null) => Boolean(
+const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null, alignmentReady: boolean) => Boolean(
   analysis
+    && alignmentReady
     && analysis.alignment.ready
     && analysis.measurementStability?.state === 'stable'
     && EYEBROW_METRIC_DISPLAY_KEYS.every((key) => (
@@ -36,12 +37,13 @@ const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null) => Boo
     )),
 );
 
-export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete }: CapturePageProps) {
+export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysisComplete }: CapturePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const autoAnalysisTimerRef = useRef<number | null>(null);
   const autoAnalysisStartedRef = useRef(false);
   const latestAnalysisRef = useRef<FaceAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isRecognitionHolding, setIsRecognitionHolding] = useState(false);
   const {
     videoRef,
     cameraPermission,
@@ -98,9 +100,11 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
     const currentAnalysis = latestAnalysisRef.current;
     if (!currentAnalysis) {
       autoAnalysisStartedRef.current = false;
+      setIsRecognitionHolding(false);
       return;
     }
 
+    setIsRecognitionHolding(false);
     setIsAnalyzing(true);
     stopCameraStream();
     window.setTimeout(() => {
@@ -110,31 +114,43 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
   }, [onAnalysisComplete, stopCameraStream]);
 
   const alignmentReady = Boolean(alignment.ready ?? (
-    alignment.detected && alignment.centered && alignment.distanceOk && alignment.pitchOk && alignment.yawOk
+    alignment.detected
+      && alignment.centered
+      && alignment.distanceOk
+      && alignment.pitchOk
+      && alignment.yawOk
+      && (alignment.gazeOk ?? true)
   ));
-  const captureReady = isMeasurementReadyForResult(analysis);
+  const captureReady = isMeasurementReadyForResult(analysis, alignmentReady);
 
   useEffect(() => {
     if (cameraPermission !== 'granted' || !analysis || !captureReady) {
+      if (autoAnalysisTimerRef.current !== null) {
+        window.clearTimeout(autoAnalysisTimerRef.current);
+        autoAnalysisTimerRef.current = null;
+      }
       autoAnalysisStartedRef.current = false;
+      setIsRecognitionHolding(false);
       return;
     }
 
     if (!captureReady || isAnalyzing || autoAnalysisStartedRef.current) return;
 
     autoAnalysisStartedRef.current = true;
+    setIsRecognitionHolding(true);
     autoAnalysisTimerRef.current = window.setTimeout(() => {
       autoAnalysisTimerRef.current = null;
       const capturedImage = captureCurrentFrame();
 
       if (!capturedImage) {
         autoAnalysisStartedRef.current = false;
+        setIsRecognitionHolding(false);
         return;
       }
 
       completeAnalysis(capturedImage);
-    }, AUTO_ANALYSIS_DELAY_MS);
-  }, [analysis, cameraPermission, captureCurrentFrame, captureReady, completeAnalysis, isAnalyzing]);
+    }, APP_TIMING_MS.recognitionHold);
+  }, [alignmentReady, analysis, cameraPermission, captureCurrentFrame, captureReady, completeAnalysis, isAnalyzing]);
 
   const liveRecommendation = useMemo(() => {
     if (!FEATURE_FLAGS.arEyebrowOverlayEnabled) return null;
@@ -145,24 +161,6 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
   }, [analysis]);
   const captureBlockedState = useMemo(() => {
     if (captureReady) return null;
-
-    if (
-      analysis?.metricConfidence
-      && !analysis.metricConfidence.reportable
-      && analysis.measurementStability?.state !== 'stable'
-    ) {
-      return {
-        label: '측정값 재확인 필요',
-        description: `기준점 신뢰도 ${Math.round(analysis.metricConfidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${analysis.metricConfidence.maxEstimatedErrorMm.toFixed(1)}mm입니다. 얼굴을 정면으로 고정해주세요.`,
-      };
-    }
-
-    if (analysis) {
-      return {
-        label: '수치 안정화 중',
-        description: '측정값이 연속 프레임에서 안정될 때까지 얼굴과 휴대폰을 잠시 고정해주세요.',
-      };
-    }
 
     if (!alignment.detected || frameGuidance?.reason === 'missing_face') {
       return {
@@ -192,61 +190,102 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onAnalysisComplete
       };
     }
 
-    if (alignmentReady) {
+    if (!alignmentReady) {
       return {
-        label: '분석 안정화 중',
-        description: '정면은 맞았습니다. 기준점이 안정되면 촬영 버튼이 활성화됩니다.',
+        label: '얼굴 위치 조정',
+        description: alignment.guidance || '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.',
+      };
+    }
+
+    if (
+      analysis?.metricConfidence
+      && !analysis.metricConfidence.reportable
+      && analysis.measurementStability?.state !== 'stable'
+    ) {
+      return {
+        label: '측정값 재확인 필요',
+        description: `기준점 신뢰도 ${Math.round(analysis.metricConfidence.overallConfidence * 100)}%, 예상 오차 최대 +/-${analysis.metricConfidence.maxEstimatedErrorMm.toFixed(1)}mm입니다. 얼굴을 정면으로 고정해주세요.`,
+      };
+    }
+
+    if (analysis) {
+      return {
+        label: '수치 안정화 중',
+        description: '측정값이 연속 프레임에서 안정될 때까지 얼굴과 휴대폰을 잠시 고정해주세요.',
       };
     }
 
     return {
-      label: '얼굴 위치 조정',
-      description: alignment.guidance || '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.',
+      label: '분석 안정화 중',
+      description: '정면은 맞았습니다. 기준점이 안정되면 촬영 버튼이 활성화됩니다.',
     };
   }, [alignment.detected, alignment.guidance, analysis, alignmentReady, captureReady, frameGuidance, ipdGuidance]);
   const PermissionIcon = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_ICONS[cameraPermission];
 
   return (
-    <div className="app-container relative bg-white px-3 pb-[calc(92px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))]">
-      <div className="mb-2 flex items-center justify-between gap-3 pl-[52px] pr-1">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold text-main-brown/55">얼굴 분석</p>
-          <h2 className="mt-0.5 truncate text-[18px] font-bold leading-tight text-main-brown">얼굴 정렬 후 측정</h2>
-        </div>
-        <div
-          className={cn(
-            "flex shrink-0 items-center gap-2 rounded-2xl border px-2.5 py-1.5 text-[10px] font-bold",
-            captureReady
-              ? "border-main-brown bg-white text-main-brown"
-              : "border-main-brown/10 bg-main-brown/5 text-sub-gray"
-          )}
-          aria-live="polite"
-        >
-          <span
-            className={cn(
-              "h-2 w-2 rounded-full",
-              captureReady ? "bg-main-brown" : "bg-main-brown/25"
-            )}
-          />
-          {captureReady ? '자동 분석' : alignmentReady ? '분석 중' : '정렬 중'}
-        </div>
-      </div>
+    <div
+      className={cn(
+        "app-container capture-page relative bg-white",
+        cameraPermission === 'granted' ? "capture-page-live" : "capture-page-permission"
+      )}
+    >
+      <section className="capture-shell flow-card" aria-labelledby="capture-heading">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="capture-card-back"
+            aria-label="이전 화면"
+          >
+            <ChevronLeft size={22} aria-hidden="true" />
+          </button>
+        )}
+        <FlowProgress currentStep={2} className="capture-progress-dots" />
 
-      <CameraPreview
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        cameraPermission={cameraPermission}
-        trackerStatus={trackerStatus}
-        alignment={alignment}
-        detectedFaceShape={detectedFaceShape}
-        liveOverlayAnchors={liveOverlayAnchors}
-        selectedRecommendation={liveRecommendation}
-        ipdGuidance={ipdGuidance}
-        frameGuidance={frameGuidance}
-        errorMessage={errorMessage}
-        PermissionIcon={PermissionIcon}
-        onRequestCameraPermission={requestCameraPermission}
-      />
+        <div className="capture-header flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-main-brown/55">얼굴 분석</p>
+            <h2 id="capture-heading" className="mt-1 text-[22px] font-bold leading-tight text-main-brown">얼굴 정렬 후 측정</h2>
+          </div>
+          <div
+            className={cn(
+              "flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-[11px] font-bold",
+              captureReady
+                ? "border-main-brown bg-white text-main-brown"
+                : "border-main-brown/10 bg-main-brown/5 text-sub-gray"
+            )}
+            aria-live="polite"
+          >
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                captureReady ? "bg-main-brown" : "bg-main-brown/25"
+              )}
+            />
+            {captureReady ? (isRecognitionHolding ? '확인 중' : '분석 준비') : alignmentReady ? '분석 중' : '정렬 중'}
+          </div>
+        </div>
+
+        <CameraPreview
+          videoRef={videoRef}
+          canvasRef={canvasRef}
+          cameraPermission={cameraPermission}
+          trackerStatus={trackerStatus}
+          alignment={alignment}
+          detectedFaceShape={detectedFaceShape}
+          liveOverlayAnchors={liveOverlayAnchors}
+          selectedRecommendation={liveRecommendation}
+          ipdGuidance={ipdGuidance}
+          frameGuidance={frameGuidance}
+          errorMessage={errorMessage}
+          PermissionIcon={PermissionIcon}
+          onRequestCameraPermission={requestCameraPermission}
+          className={cn(
+            "capture-preview-frame",
+            cameraPermission === 'granted' ? "capture-preview-live" : "capture-preview-permission"
+          )}
+        />
+      </section>
 
       {cameraPermission === 'granted' && (
         <Controls

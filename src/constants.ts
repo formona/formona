@@ -11,6 +11,7 @@ export enum Page {
   CAPTURE = 3,
   RECOMMENDATIONS = 4,
   RESULT = 5,
+  ADDRESS = 6,
 }
 
 export const BRAND_COLORS = {
@@ -31,6 +32,7 @@ export const IPD_CONFIG = {
 
 export const APP_TIMING_MS = {
   splash: 1500,
+  recognitionHold: 1800,
   analysisTransition: 1600,
 } as const;
 
@@ -42,6 +44,13 @@ export const ADMIN_DEMO_AUTH_CONFIG = {
   defaultPasscode: 'formona-demo',
   sessionStorageKey: 'formona_admin_demo_passcode',
 } as const;
+
+export const normalizeAdminPasscode = (value: string) => (
+  value
+    .trim()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-')
+    .replace(/\s*-\s*/g, '-')
+);
 
 export const FRONT_CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
