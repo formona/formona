@@ -112,10 +112,10 @@ export function ResultPage({
               <Image
                 src={capturedImage}
                 alt="분석 촬영 이미지"
-                width={330}
-                height={310}
+                fill
+                sizes="(max-width: 430px) calc(100vw - 72px), 340px"
                 unoptimized
-                className="h-full w-full object-cover object-center"
+                className="object-cover object-center"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-main-brown/35">

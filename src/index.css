@@ -449,8 +449,16 @@
 }
 
 .result-photo-frame {
-  height: clamp(340px, 44dvh, 392px);
+  width: min(100%, 340px);
+  height: auto;
   max-width: 100%;
+  aspect-ratio: 5 / 6;
+}
+
+@supports not (aspect-ratio: 1 / 1) {
+  .result-photo-frame {
+    height: 408px;
+  }
 }
 
 .result-card::-webkit-scrollbar,
@@ -642,7 +650,7 @@
   }
 
   .result-photo-frame {
-    height: clamp(300px, 43dvh, 350px);
+    width: min(100%, 326px);
   }
 
   .ipd-value-control {
@@ -747,7 +755,7 @@
   }
 
   .result-photo-frame {
-    height: clamp(250px, 40dvh, 300px);
+    width: min(100%, 286px);
   }
 
   .ipd-input-section {
