@@ -111,6 +111,19 @@ describe('GET /api/admin/orders', () => {
     expect(databaseMock.listOrderRecords).toHaveBeenCalledTimes(1);
   });
 
+  it('normalizes passcode spacing variants before comparison', async () => {
+    vi.stubEnv('FORMONA_ADMIN_PASSCODE', 'formona-admin');
+
+    const response = await GET(new Request('http://localhost/api/admin/orders', {
+      headers: {
+        'x-formona-admin-passcode': ' formona - admin ',
+      },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(databaseMock.listOrderRecords).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the demo passcode when no server passcode is configured', async () => {
     const response = await GET(new Request('http://localhost/api/admin/orders', {
       headers: {
