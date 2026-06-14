@@ -965,8 +965,8 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     const resultImage = screen.getByAltText('분석 촬영 이미지');
 
     expect(resultImage).toBeInTheDocument();
-    expect(resultImage).toHaveClass('object-contain');
-    expect(resultImage).not.toHaveClass('object-cover');
+    expect(resultImage).toHaveClass('object-cover');
+    expect(resultImage).not.toHaveClass('object-contain');
     expect(container.querySelector('video')).not.toBeInTheDocument();
     expect(screen.queryByTestId('camera-ar-overlay')).not.toBeInTheDocument();
     expect(screen.queryByText('LIVE AR')).not.toBeInTheDocument();
