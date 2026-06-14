@@ -5,29 +5,67 @@ import { ADMIN_DEMO_AUTH_CONFIG } from '../../constants';
 import { analyzeFaceLandmarks } from '../../domain/face-analysis';
 import { EYEBROW_METRIC_FIXTURES } from '../../domain/eyebrow-metric-fixtures';
 import { buildMeasurementDataPayload } from '../../domain/measurement-payload';
-import { addMeasurementRecord } from '../../domain/measurement-records';
+import {
+  buildOrderDataPayload,
+  buildOrderSubmissionPayload,
+  type StoredOrderRecord,
+} from '../../domain/order-records';
 import AdminPage from './page';
 
-const buildStoredRecords = () => {
+const buildStoredRecords = (): StoredOrderRecord[] => {
   const fixture = EYEBROW_METRIC_FIXTURES[0];
   const analysis = analyzeFaceLandmarks(fixture.landmarks, fixture.ipdMm, fixture.dimensions);
 
   if (!analysis) throw new Error('Expected fixture analysis');
 
-  return addMeasurementRecord(
-    [],
-    buildMeasurementDataPayload({
-      analysis,
-      measuredAtIso: '2026-06-12T00:00:00.000Z',
-      selectedStyle: {
-        id: 'soft-arch',
-        name: '부드러운 아치형',
-        description: '테스트 추천 스타일',
-        path: 'M0,0 Q50,20 100,0',
-      },
+  const measurement = buildMeasurementDataPayload({
+    analysis,
+    measuredAtIso: '2026-06-12T00:00:00.000Z',
+    selectedStyle: {
+      id: 'soft-arch',
+      name: '부드러운 아치형',
+      description: '테스트 추천 스타일',
+      path: 'M0,0 Q50,20 100,0',
+    },
+  });
+  const submission = buildOrderSubmissionPayload({
+    submittedAtIso: '2026-06-12T00:02:00.000Z',
+    measurement,
+    shippingAddress: {
+      recipient: '홍길동',
+      phone: '010-1234-5678',
+      postalCode: '06142',
+      baseAddress: '서울 강남구 테헤란로 123',
+      detailAddress: '101동 1203호',
+      deliveryMemo: '문 앞에 놓아주세요',
+    },
+  });
+
+  return [{
+    id: 'order-1',
+    orderedAtIso: submission.submittedAtIso,
+    measurementRecordId: 'measurement-1',
+    status: 'submitted',
+    payload: buildOrderDataPayload({
+      submission,
+      measurementRecordId: 'measurement-1',
+      orderedAtIso: submission.submittedAtIso,
     }),
-    new Date('2026-06-12T00:01:00.000Z'),
-  );
+    measurement: {
+      id: 'measurement-1',
+      savedAtIso: '2026-06-12T00:01:00.000Z',
+      payload: buildMeasurementDataPayload({
+        analysis,
+        measuredAtIso: '2026-06-12T00:00:00.000Z',
+        selectedStyle: {
+          id: 'soft-arch',
+          name: '부드러운 아치형',
+          description: '테스트 추천 스타일',
+          path: 'M0,0 Q50,20 100,0',
+        },
+      }),
+    },
+  }];
 };
 
 describe('AdminPage', () => {
@@ -48,11 +86,11 @@ describe('AdminPage', () => {
     }));
   });
 
-  it('hides measurement records until the demo passcode is entered', async () => {
+  it('hides order records until the demo passcode is entered', async () => {
     render(<AdminPage />);
 
     expect(await screen.findByRole('heading', { name: '관리자 접근' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '사용자 측정 수치' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '주문 및 측정 정보' })).not.toBeInTheDocument();
     expect(screen.queryByText('부드러운 아치형')).not.toBeInTheDocument();
   });
 
@@ -63,7 +101,17 @@ describe('AdminPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '접속' }));
 
     expect(await screen.findByText('비밀번호가 올바르지 않습니다.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '사용자 측정 수치' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '주문 및 측정 정보' })).not.toBeInTheDocument();
+  });
+
+  it('does not show an incorrect passcode error for a stale stored session', async () => {
+    sessionStorage.setItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey, 'stale-passcode');
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole('heading', { name: '관리자 접근' })).toBeInTheDocument();
+    expect(screen.queryByText('비밀번호가 올바르지 않습니다.')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey)).toBeNull();
   });
 
   it('toggles passcode visibility from the admin login form', async () => {
@@ -80,16 +128,18 @@ describe('AdminPage', () => {
     expect(passcodeInput).toHaveAttribute('type', 'password');
   });
 
-  it('shows measurement records after the demo passcode is accepted', async () => {
+  it('shows order records after the demo passcode is accepted', async () => {
     render(<AdminPage />);
 
     fireEvent.change(await screen.findByLabelText('비밀번호'), {
-      target: { value: ADMIN_DEMO_AUTH_CONFIG.defaultPasscode },
+      target: { value: ' formona – demo ' },
     });
     fireEvent.click(screen.getByRole('button', { name: '접속' }));
 
-    expect(await screen.findByRole('heading', { name: '사용자 측정 수치' })).toBeInTheDocument();
-    expect(screen.getAllByText('부드러운 아치형').length).toBeGreaterThan(0);
+    expect(await screen.findByRole('heading', { name: '주문 및 측정 정보' })).toBeInTheDocument();
+    expect(screen.getAllByText('홍길동').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/부드러운 아치형/).length).toBeGreaterThan(0);
+    expect(screen.getByText('서울 강남구 테헤란로 123')).toBeInTheDocument();
     expect(sessionStorage.getItem(ADMIN_DEMO_AUTH_CONFIG.sessionStorageKey)).toBe(ADMIN_DEMO_AUTH_CONFIG.defaultPasscode);
   });
 
@@ -98,7 +148,7 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
-    expect(await screen.findByRole('heading', { name: '사용자 측정 수치' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '주문 및 측정 정보' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
 
     expect(await screen.findByRole('heading', { name: '관리자 접근' })).toBeInTheDocument();

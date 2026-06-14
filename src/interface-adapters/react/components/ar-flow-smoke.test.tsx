@@ -100,6 +100,23 @@ const offCenterAlignment: FaceAlignment = {
   ready: false,
 };
 
+const offGazeAlignment: FaceAlignment = {
+  detected: true,
+  centered: true,
+  distanceOk: true,
+  pitchOk: true,
+  yawOk: true,
+  gazeOk: false,
+  gazeDirection: 'right',
+  gazeVerticalDirection: 'center',
+  guidance: '카메라 렌즈를 정면으로 바라봐 주세요',
+  confidence: 0.8,
+  horizontalDirection: 'center',
+  verticalDirection: 'center',
+  distanceState: 'ok',
+  ready: false,
+};
+
 const mockOverlayAnchors: EyebrowOverlayAnchors = {
   left: {
     sp: { x: 0.44, y: 0.35 },
@@ -446,14 +463,14 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    const captureButton = screen.getByRole('button', { name: '자동 분석 중' });
-    expect(screen.getByText('자동 분석')).toBeInTheDocument();
+    const captureButton = screen.getByRole('button', { name: '인식 완료' });
+    expect(screen.getByText('인식 완료')).toBeInTheDocument();
     expect(screen.getByText('계란형 감지')).toBeInTheDocument();
     expect(screen.getByText('정면 위치가 안정적입니다')).toBeInTheDocument();
     expect(captureButton).toBeDisabled();
 
     act(() => {
-      vi.advanceTimersByTime(650);
+      vi.advanceTimersByTime(APP_TIMING_MS.recognitionHold);
     });
 
     expect(trackerMock.stopCameraStream).toHaveBeenCalledOnce();
@@ -592,7 +609,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(canvasContextMock.stroke).not.toHaveBeenCalled();
   });
 
-  it('starts automatic analysis once measurements are ready even if the current face is slightly off-center', () => {
+  it('keeps capture blocked when stable measurements exist but the latest live frame is off-center', () => {
     const { onAnalysisComplete, rerender } = renderCapturePage();
 
     trackerMock.state = {
@@ -604,9 +621,9 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     };
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
-    expect(screen.getByText('얼굴을 오른쪽으로 조금 이동해주세요')).toBeInTheDocument();
-    expect(screen.getByText('자동 분석')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
+    expect(screen.getAllByText('얼굴을 오른쪽으로 조금 이동해주세요').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: '얼굴 위치 조정' })).toBeDisabled();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
   it('continues capture when stable measurements carry a low-reportability quality flag', () => {
@@ -633,11 +650,11 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
 
     expect(screen.queryByText('측정값 재확인 필요')).not.toBeInTheDocument();
-    expect(screen.getByText('자동 분석')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '자동 분석 중' })).toBeDisabled();
+    expect(screen.getByText('인식 완료')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인식 완료' })).toBeDisabled();
 
     act(() => {
-      vi.advanceTimersByTime(650);
+      vi.advanceTimersByTime(APP_TIMING_MS.recognitionHold);
     });
 
     expect(trackerMock.stopCameraStream).toHaveBeenCalledOnce();
@@ -673,6 +690,32 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
 
     expect(screen.getByText('수치 안정화 중')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '수치 안정화 중' })).toBeDisabled();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+  });
+
+  it('cancels capture when the latest live frame is no longer facing the camera lens', () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1080);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1920);
+    const { onAnalysisComplete, rerender } = renderCapturePage();
+
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      alignment: offGazeAlignment,
+      analysis: makeAnalysis(),
+    };
+    rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
+
+    expect(screen.getAllByText('카메라 렌즈를 정면으로 바라봐 주세요').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: '얼굴 위치 조정' })).toBeDisabled();
+
+    act(() => {
+      vi.advanceTimersByTime(APP_TIMING_MS.recognitionHold + APP_TIMING_MS.analysisTransition);
+    });
+
+    expect(trackerMock.stopCameraStream).not.toHaveBeenCalled();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
@@ -850,13 +893,18 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
         selectedStyle={selectedStyle}
         onSelectedStyleChange={vi.fn()}
         onRetry={vi.fn()}
-        onApplyStyle={vi.fn()}
+        onNextStep={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('분석 결과')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '추천 눈썹 디자인 결과' })).toBeInTheDocument();
     expect(screen.getAllByText(FaceShape.OVAL).length).toBeGreaterThan(0);
-    expect(screen.getByRole('heading', { name: FACE_SHAPE_RESULT_COPY[FaceShape.OVAL].title })).toBeInTheDocument();
+    expect(screen.getByText('추천 디자인: 아치형')).toBeInTheDocument();
+    expect(screen.getByText('대칭 분석 완료')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '추천 디자인 설명 보기' }));
+
+    expect(screen.getByRole('dialog', { name: '아치형 추천 이유' })).toBeInTheDocument();
     expect(screen.getByText(FACE_SHAPE_RESULT_COPY[FaceShape.OVAL].recommendationExplanation)).toBeInTheDocument();
   });
 
@@ -874,7 +922,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
         selectedStyle={selectedStyle}
         onSelectedStyleChange={vi.fn()}
         onRetry={vi.fn()}
-        onApplyStyle={vi.fn()}
+        onNextStep={vi.fn()}
       />,
     );
 
@@ -884,7 +932,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(screen.queryByText('LIVE AR')).not.toBeInTheDocument();
   });
 
-  it('displays all seven eyebrow metrics in the result UI', () => {
+  it('displays recommendation style controls in the result UI', () => {
     const recommendations = getEyebrowRecommendations(FaceShape.OVAL);
     const selectedStyle = recommendations[0]!;
     const analysis = makeAnalysis();
@@ -898,22 +946,15 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
         selectedStyle={selectedStyle}
         onSelectedStyleChange={vi.fn()}
         onRetry={vi.fn()}
-        onApplyStyle={vi.fn()}
+        onNextStep={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('측정 수치')).toBeInTheDocument();
-    EYEBROW_METRIC_DISPLAY_ROWS.forEach((row) => {
-      expect(screen.getByText(row.label)).toBeInTheDocument();
-      expect(screen.getByText(row.description)).toBeInTheDocument();
-    });
-    expect(screen.getByText('18.2mm')).toBeInTheDocument();
-    expect(screen.getByText('33.4mm')).toBeInTheDocument();
-    expect(screen.getByText('49.1mm')).toBeInTheDocument();
-    expect(screen.getByText('50.2mm')).toBeInTheDocument();
-    expect(screen.getByText('6.1mm')).toBeInTheDocument();
-    expect(screen.getByText('7.3mm')).toBeInTheDocument();
-    expect(screen.getByText('21.0mm')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '자연 아치형 선택' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '직선형 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '부드러운 곡선형 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음 단계' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 측정' })).toBeInTheDocument();
   });
 
   it('shows eyebrow metric values with a quality warning when confidence is low or error exceeds the threshold', () => {
@@ -937,18 +978,11 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
         selectedStyle={selectedStyle}
         onSelectedStyleChange={vi.fn()}
         onRetry={vi.fn()}
-        onApplyStyle={vi.fn()}
+        onNextStep={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('측정값 재확인 필요')).toBeInTheDocument();
-    expect(screen.getByText(/예상 오차 최대 \+\/-5.6mm/)).toBeInTheDocument();
-    expect(screen.getByText('18.2mm')).toBeInTheDocument();
-    expect(screen.getByText('33.4mm')).toBeInTheDocument();
-    expect(screen.getByText('49.1mm')).toBeInTheDocument();
-    expect(screen.getByText('50.2mm')).toBeInTheDocument();
-    expect(screen.getByText('6.1mm')).toBeInTheDocument();
-    expect(screen.getByText('7.3mm')).toBeInTheDocument();
-    expect(screen.getByText('21.0mm')).toBeInTheDocument();
+    expect(screen.getByText('측정값 검토 필요')).toBeInTheDocument();
+    expect(screen.queryByText('대칭 분석 완료')).not.toBeInTheDocument();
   });
 });

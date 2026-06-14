@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { ADMIN_DEMO_AUTH_CONFIG, normalizeAdminPasscode } from '../../../../constants';
-import { listMeasurementRecords } from '../../../../infrastructure/database/measurement-records';
+import { listOrderRecords } from '../../../../infrastructure/database/order-records';
 
 export const runtime = 'nodejs';
 
@@ -24,10 +24,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const records = await listMeasurementRecords();
+    const records = await listOrderRecords();
     return NextResponse.json({ records });
   } catch (error) {
-    console.error('Failed to load measurement records.', error);
-    return NextResponse.json({ error: 'Failed to load measurement records.' }, { status: 500 });
+    console.error('Failed to load order records.', error);
+    return NextResponse.json({ error: 'Failed to load order records.' }, { status: 500 });
   }
 }

@@ -44,9 +44,9 @@ export const Controls = (props: ControlsProps) => {
   }
 
   if (props.mode === 'capture') {
-    const captureLabel = props.analysisReady ? '자동 분석 중' : props.disabledLabel ?? '얼굴 정렬 필요';
+    const captureLabel = props.analysisReady ? '인식 완료' : props.disabledLabel ?? '얼굴 정렬 필요';
     const captureDescription = props.analysisReady
-      ? '얼굴 기준점이 확인되었습니다. 추천 화면으로 자동 이동합니다.'
+      ? '얼굴 기준점을 안정적으로 확인했습니다. 잠시 고정하면 정밀 분석으로 이동합니다.'
       : props.disabledDescription ?? '얼굴 전체를 타원 안에 맞추면 촬영 버튼이 활성화됩니다.';
 
     return (

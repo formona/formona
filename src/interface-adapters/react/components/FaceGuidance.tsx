@@ -151,31 +151,33 @@ export const FaceGuidance = ({
             </p>
           </div>
         )}
-        <div className="flex items-center justify-between gap-2 rounded-2xl border border-main-brown/10 bg-white px-3 py-2.5">
-          <p className="flex min-w-[112px] flex-1 items-center gap-2 text-[11px] font-bold text-main-brown">
-            {aligned ? <CheckCircle2 size={14} className="shrink-0" /> : faceDetected ? <MoveHorizontal size={14} className="shrink-0" /> : <ScanFace size={14} className="shrink-0" />}
-            <span className="truncate">{statusLabel}</span>
-          </p>
-          {detectedFaceShape && (
-            <span
-              className="shrink-0 rounded-full bg-main-brown/8 px-2 py-0.5 text-[10px] font-bold text-main-brown"
-              aria-label={`감지된 얼굴형 ${detectedFaceShape}`}
-            >
-              {detectedFaceShape} 감지
-            </span>
-          )}
+        <div className="rounded-2xl border border-main-brown/10 bg-white px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="flex min-w-0 flex-1 items-center gap-2 text-[11px] font-bold text-main-brown">
+              {aligned ? <CheckCircle2 size={14} className="shrink-0" /> : faceDetected ? <MoveHorizontal size={14} className="shrink-0" /> : <ScanFace size={14} className="shrink-0" />}
+              <span className="truncate">{statusLabel}</span>
+            </p>
+            {detectedFaceShape && (
+              <span
+                className="shrink-0 rounded-full bg-main-brown/8 px-2 py-0.5 text-[10px] font-bold text-main-brown"
+                aria-label={`감지된 얼굴형 ${detectedFaceShape}`}
+              >
+                {detectedFaceShape} 감지
+              </span>
+            )}
+            <span className={cn(
+              "h-2.5 w-2.5 shrink-0 rounded-full",
+              aligned ? "bg-main-brown" : faceDetected ? "bg-main-brown/50" : "bg-main-brown/25"
+            )} />
+          </div>
           {faceDetected && (
-            <div className="h-1.5 min-w-[76px] overflow-hidden rounded-full bg-main-brown/10" aria-label={`정렬 정확도 ${Math.round(alignment.confidence * 100)}%`}>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-main-brown/10" aria-label={`정렬 정확도 ${Math.round(alignment.confidence * 100)}%`}>
               <div
                 className={cn("h-full rounded-full", aligned ? "bg-main-brown" : "bg-main-brown/50")}
                 style={{ width: `${Math.round(alignment.confidence * 100)}%` }}
               />
             </div>
           )}
-          <span className={cn(
-            "h-2.5 w-2.5 shrink-0 rounded-full",
-            aligned ? "bg-main-brown" : faceDetected ? "bg-main-brown/50" : "bg-main-brown/25"
-          )} />
         </div>
       </div>
     </>

@@ -1,11 +1,11 @@
 "use client";
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, Eye, Info, Loader2, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, Eye, Info, Loader2, Minus, Plus, RefreshCw, TriangleAlert } from 'lucide-react';
 import {
   APP_TIMING_MS,
-  BRAND_COLORS,
   FACE_SHAPE_RESULT_COPY,
   IPD_CONFIG,
   Page,
@@ -19,8 +19,19 @@ import { buildEyebrowRecommendationState } from '../usecases/eyebrow-recommendat
 import { CapturePage } from '../interface-adapters/react/components/CapturePage';
 import { RecommendationResults } from '../interface-adapters/react/components/RecommendationResults';
 import { ResultPage } from '../interface-adapters/react/components/ResultPage';
+import {
+  AddressPage,
+  DEFAULT_ADDRESS_FORM_VALUES,
+  type AddressFormState,
+} from '../interface-adapters/react/components/AddressPage';
+import { FlowProgress } from '../interface-adapters/react/components/FlowProgress';
 import { parseValidIpd, resolveIpdFallback, type IpdFallbackSource } from '../usecases/ipd';
-import { buildMeasurementDataPayload, type MeasurementDataPayload } from '../domain/measurement-payload';
+import { buildMeasurementDataPayload } from '../domain/measurement-payload';
+import {
+  buildOrderSubmissionPayload,
+  type OrderSubmissionPayload,
+  type ShippingAddressPayload,
+} from '../domain/order-records';
 
 const getIpdFallbackNotice = (source: IpdFallbackSource, value: number) => {
   if (source === 'last-valid') {
@@ -34,19 +45,30 @@ const getIpdFallbackNotice = (source: IpdFallbackSource, value: number) => {
   return null;
 };
 
-const saveMeasurementRecord = async (payload: MeasurementDataPayload) => {
-  try {
-    await fetch('/api/measurements', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    // Result rendering should not depend on remote admin storage availability.
+const IPD_STEPPER_DELTA_MM = 1;
+
+const saveOrderRecord = async (payload: OrderSubmissionPayload) => {
+  const response = await fetch('/api/orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Order request failed: ${response.status}`);
   }
 };
+
+const buildShippingAddressPayload = (values: AddressFormState): ShippingAddressPayload => ({
+  recipient: values.recipient,
+  phone: values.phone,
+  postalCode: values.postalCode,
+  baseAddress: values.baseAddress,
+  detailAddress: values.detailAddress,
+  deliveryMemo: values.deliveryMemo,
+});
 
 export default function HomePage() {
   const [currentPage, setCurrentPage] = useState<Page>(Page.SPLASH);
@@ -83,9 +105,25 @@ export default function HomePage() {
   const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysisResult | null>(null);
   const [recommendationContext, setRecommendationContext] = useState<EyebrowRecommendationContext | null>(null);
   const [autoStartCapture, setAutoStartCapture] = useState(false);
+  const [addressFormValues, setAddressFormValues] = useState<AddressFormState>(DEFAULT_ADDRESS_FORM_VALUES);
   const currentIpdInput = parseValidIpd(ipdInput);
   const ipdInputError = ipdInput.length > 0 && currentIpdInput === null;
-  const canGoBack = currentPage === Page.CAPTURE || currentPage === Page.RECOMMENDATIONS || currentPage === Page.RESULT;
+  const ipdStepperValue = currentIpdInput ?? ipd;
+  const canDecreaseIpd = ipdStepperValue > IPD_CONFIG.minMm;
+  const canIncreaseIpd = ipdStepperValue < IPD_CONFIG.maxMm;
+  const canGoBack = currentPage === Page.RECOMMENDATIONS;
+
+  const adjustIpdInput = (deltaMm: number) => {
+    const baseIpd = parseValidIpd(ipdInput) ?? ipd;
+    const nextIpd = Math.min(
+      IPD_CONFIG.maxMm,
+      Math.max(IPD_CONFIG.minMm, Number((baseIpd + deltaMm).toFixed(1))),
+    );
+
+    setIpdInput(String(nextIpd));
+    setIpdSaved(false);
+    setIpdFallbackNotice(null);
+  };
 
   const handleAnalysisComplete = (imageDataUrl: string, analysis: FaceAnalysisResult) => {
     const nextRecommendationState = buildEyebrowRecommendationState(analysis);
@@ -97,12 +135,26 @@ export default function HomePage() {
     setSelectedStyle(nextSelectedStyle);
     setAutoStartCapture(false);
     if (nextRecommendationState.status === 'ready') {
-      void saveMeasurementRecord(buildMeasurementDataPayload({ analysis, selectedStyle: nextSelectedStyle }));
       setCurrentPage(Page.RESULT);
       return;
     }
 
     setCurrentPage(Page.RECOMMENDATIONS);
+  };
+
+  const goToAddress = () => {
+    setCurrentPage(Page.ADDRESS);
+  };
+
+  const submitOrder = async (values: AddressFormState) => {
+    if (!faceAnalysis) {
+      throw new Error('Missing face analysis for order submission.');
+    }
+
+    await saveOrderRecord(buildOrderSubmissionPayload({
+      measurement: buildMeasurementDataPayload({ analysis: faceAnalysis, selectedStyle }),
+      shippingAddress: buildShippingAddressPayload(values),
+    }));
   };
 
   const saveIpd = () => {
@@ -133,6 +185,9 @@ export default function HomePage() {
         setAutoStartCapture(true);
         setCurrentPage(Page.CAPTURE);
         break;
+      case Page.ADDRESS:
+        setCurrentPage(Page.RESULT);
+        break;
       default:
         break;
     }
@@ -155,25 +210,30 @@ export default function HomePage() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35 }}
-      className="app-container items-center justify-center bg-main-brown px-10 text-center text-white"
-      aria-label="MONABROW splash screen"
+      className="app-container splash-page items-center justify-center bg-white px-10 text-center"
+      aria-label="FORMONA loading screen"
     >
       <motion.div
-        initial={{ opacity: 0, y: 12, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0, y: -4, scale: 0.97 }}
+        animate={{ opacity: 1, y: -22, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="flex flex-col items-center gap-8"
+        className="splash-lockup flex flex-col items-center gap-4"
       >
-        <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-white/20 bg-white">
-          <svg width="48" height="48" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-            <path d="M10 5H30V10H15V18H28V23H15V35H10V5Z" fill={BRAND_COLORS.brown} />
-          </svg>
+        <div className="splash-logo-frame flex w-[60vw] max-w-[236px] items-center justify-center">
+          <Image
+            src="/brand/formona-logo-vertical.svg"
+            alt="formona"
+            width={165}
+            height={111}
+            priority
+            className="h-auto w-full select-none"
+            draggable={false}
+          />
         </div>
 
-        <div className="space-y-3">
-          <p className="text-[11px] font-bold text-white/65">FORMONA</p>
-          <h1 className="text-[42px] font-bold leading-none tracking-normal">MONABROW</h1>
-          <p className="text-[15px] font-light leading-relaxed text-white/75">
+        <div className="splash-copy space-y-2">
+          <h1 className="splash-service-name text-[28px] font-bold leading-none tracking-normal text-main-brown/95">MONABROW</h1>
+          <p className="text-[12.5px] font-light leading-[1.6] text-sub-gray/80">
             첫 인상을 디자인하다,<br />눈썹 화장의 원픽
           </p>
         </div>
@@ -190,7 +250,9 @@ export default function HomePage() {
       exit={{ opacity: 0, x: -20 }}
       className="app-container ipd-page"
     >
-      <div className="glass ipd-card w-full text-center relative overflow-hidden">
+      <div className="glass ipd-card flow-card w-full text-center relative overflow-hidden">
+        <FlowProgress currentStep={1} className="mx-auto" />
+
         <div className="ipd-header space-y-4">
           <div className="ipd-icon w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-glass-border">
             <Eye size={26} className="text-main-brown" aria-hidden="true" />
@@ -199,26 +261,57 @@ export default function HomePage() {
           <p className="text-sub-gray text-[14px] font-light leading-relaxed">보다 정밀한 가상 메이크업을 위해<br />본인의 동공 간격을 입력해주세요.</p>
         </div>
 
-        <div className="ipd-input-section relative pt-[4px] pb-2">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={IPD_CONFIG.minMm}
-            max={IPD_CONFIG.maxMm}
-            step={IPD_CONFIG.inputStep}
-            value={ipdInput}
-            onChange={(e) => {
-              setIpdInput(e.target.value);
-              setIpdSaved(false);
-              setIpdFallbackNotice(null);
-            }}
-            onBlur={saveIpd}
-            aria-label="동공 간격 밀리미터"
-            aria-invalid={ipdInputError}
-            className="ipd-input w-full text-center text-7xl font-bold bg-transparent border-0 outline-none text-main-brown"
-            placeholder={String(IPD_CONFIG.defaultMm)}
-          />
-          <span className="block mt-2 text-main-brown/45 font-bold text-sm">mm</span>
+        <div className="ipd-input-section relative">
+          <div className="ipd-value-control">
+            <button
+              type="button"
+              onClick={() => adjustIpdInput(-IPD_STEPPER_DELTA_MM)}
+              disabled={!canDecreaseIpd}
+              aria-label="IPD 1mm 감소"
+              className="ipd-stepper-button"
+            >
+              <Minus size={18} aria-hidden="true" />
+            </button>
+
+            <div className="ipd-value-field">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={IPD_CONFIG.minMm}
+                max={IPD_CONFIG.maxMm}
+                step={IPD_CONFIG.inputStep}
+                value={ipdInput}
+                onChange={(e) => {
+                  setIpdInput(e.target.value);
+                  setIpdSaved(false);
+                  setIpdFallbackNotice(null);
+                }}
+                onBlur={saveIpd}
+                aria-label="동공 간격 밀리미터"
+                aria-invalid={ipdInputError}
+                className="ipd-input w-full text-center text-7xl font-bold bg-transparent border-0 outline-none text-main-brown"
+                placeholder={String(IPD_CONFIG.defaultMm)}
+              />
+              <span className="block mt-2 text-main-brown/45 font-bold text-sm">mm</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => adjustIpdInput(IPD_STEPPER_DELTA_MM)}
+              disabled={!canIncreaseIpd}
+              aria-label="IPD 1mm 증가"
+              className="ipd-stepper-button"
+            >
+              <Plus size={18} aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="ipd-range-rail" aria-hidden="true">
+            <span>{IPD_CONFIG.minMm}</span>
+            <i />
+            <span>{IPD_CONFIG.maxMm}</span>
+          </div>
+
           <div className="mt-4 min-h-5">
             {ipdInputError ? (
               <p className="text-xs font-bold text-main-brown">
@@ -399,6 +492,7 @@ export default function HomePage() {
             key="capture"
             ipdMm={ipd}
             autoStartCamera={autoStartCapture}
+            onBack={goBack}
             onAnalysisComplete={handleAnalysisComplete}
           />
         )}
@@ -413,10 +507,16 @@ export default function HomePage() {
             selectedStyle={selectedStyle}
             onSelectedStyleChange={setSelectedStyle}
             onRetry={restartScan}
-            onApplyStyle={() => {
-              setAutoStartCapture(false);
-              setCurrentPage(Page.IPD_INPUT);
-            }}
+            onNextStep={goToAddress}
+          />
+        )}
+        {currentPage === Page.ADDRESS && (
+          <AddressPage
+            key="address"
+            initialValues={addressFormValues}
+            onValuesChange={setAddressFormValues}
+            onPrevious={() => setCurrentPage(Page.RESULT)}
+            onSubmit={submitOrder}
           />
         )}
       </AnimatePresence>

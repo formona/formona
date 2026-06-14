@@ -19,9 +19,35 @@ model MeasurementRecord {
   overallConfidence   Float?
   maxEstimatedErrorMm Float?
   payload             Json
+  orders              OrderRecord[]
 
   @@index([savedAt])
   @@index([faceShape])
   @@index([reportable])
   @@map("measurement_records")
+}
+
+model OrderRecord {
+  id                  String            @id @default(cuid())
+  orderedAt           DateTime          @default(now())
+  measurementRecordId String
+  measurementRecord   MeasurementRecord @relation(fields: [measurementRecordId], references: [id], onDelete: Cascade)
+  status              String            @default("submitted")
+  recipient           String
+  phone               String
+  postalCode          String
+  baseAddress         String
+  detailAddress       String
+  deliveryMemo        String?
+  faceShape           String
+  selectedStyleId     String?
+  selectedStyleName   String?
+  ipdMm               Float
+  payload             Json
+
+  @@index([orderedAt])
+  @@index([measurementRecordId])
+  @@index([status])
+  @@index([phone])
+  @@map("order_records")
 }

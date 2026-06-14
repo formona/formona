@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HomePage from './page';
-import { APP_TIMING_MS, FACE_SHAPE_RESULT_COPY } from '../constants';
+import { APP_TIMING_MS } from '../constants';
 import {
   FaceShape,
   type EyebrowOverlayAnchors,
@@ -252,6 +252,7 @@ describe('HomePage recommendation routing', () => {
   });
 
   afterEach(() => {
+    delete window.kakao;
     vi.useRealTimers();
   });
 
@@ -265,23 +266,19 @@ describe('HomePage recommendation routing', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mock capture complete' }));
 
-    expect(screen.getByRole('heading', { name: FACE_SHAPE_RESULT_COPY[FaceShape.HEART].title })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '추천 눈썹 디자인 결과' })).toBeInTheDocument();
     expect(screen.getAllByText(FaceShape.HEART).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('직선 수평형').length).toBeGreaterThan(0);
-    expect(screen.queryByText('자연 아치형')).not.toBeInTheDocument();
+    expect(screen.getByText('추천 디자인: 일자형')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '직선 수평형 선택' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: '자연 아치형 선택' })).not.toBeInTheDocument();
 
-    expect(fetch).toHaveBeenCalledWith('/api/measurements', expect.objectContaining({
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }));
-    const [, requestInit] = vi.mocked(fetch).mock.calls[0] ?? [];
-    const payload = JSON.parse(String(requestInit?.body));
-    expect(payload).toMatchObject({
-      faceShape: FaceShape.HEART,
-      selectedStyle: { name: '직선 수평형' },
-    });
+    expect(fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '낮은 아치형 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
+
+    expect(screen.getByRole('heading', { name: '배송지 정보 입력' })).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('continues to results when captured geometry confidence is zero but measurements are valid', async () => {
@@ -309,7 +306,7 @@ describe('HomePage recommendation routing', () => {
 
     expect(screen.queryByText('Recommendation Error')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '기준점 신뢰도가 낮아요' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('직선 수평형').length).toBeGreaterThan(0);
+    expect(screen.getByText('추천 디자인: 일자형')).toBeInTheDocument();
   });
 
   it('shows an explicit recommendation error instead of fallback styles when metrics are invalid', async () => {
@@ -348,9 +345,175 @@ describe('HomePage recommendation routing', () => {
     expect(capturePageMock.props.at(-1)).toEqual({ autoStartCamera: false });
 
     fireEvent.click(screen.getByRole('button', { name: 'Mock capture complete' }));
-    fireEvent.click(screen.getByRole('button', { name: '다시 찍기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 측정' }));
 
     expect(screen.getByText('Mock camera auto-start')).toBeInTheDocument();
     expect(capturePageMock.props.at(-1)).toEqual({ autoStartCamera: true });
+  });
+
+  it('opens the address form after the result next step and can return to result', async () => {
+    render(<HomePage />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(APP_TIMING_MS.splash);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mock capture complete' }));
+    fireEvent.click(screen.getByRole('button', { name: '낮은 아치형 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
+
+    expect(screen.getByRole('heading', { name: '배송지 정보 입력' })).toBeInTheDocument();
+    expect(screen.getByLabelText('받는 분')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '주문 완료' })).toBeInTheDocument();
+
+    const submitOrderButton = screen.getByRole('button', { name: '주문 완료' });
+    fireEvent.click(submitOrderButton);
+
+    expect(screen.getByText('받는 분, 연락처, 배송지 주소, 상세 주소 확인이 필요합니다.')).toBeInTheDocument();
+    expect(screen.getByText('받는 분을 입력해주세요.')).toBeInTheDocument();
+    expect(screen.getByText('연락처를 입력해주세요.')).toBeInTheDocument();
+    expect(screen.getByText('주소 검색으로 배송지를 선택해주세요.')).toBeInTheDocument();
+    expect(screen.getByText('상세 주소를 입력해주세요.')).toBeInTheDocument();
+    expect(screen.getByLabelText('받는 분')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('연락처')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('우편번호')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('기본 주소')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('상세 주소')).toHaveAttribute('aria-invalid', 'true');
+
+    window.kakao = {
+      Postcode: vi.fn(function MockPostcode(
+        this: { open: () => void },
+        options: { oncomplete: (data: {
+          zonecode: string;
+          address: string;
+          roadAddress: string;
+          jibunAddress: string;
+          userSelectedType: 'R' | 'J';
+          bname: string;
+          buildingName: string;
+          apartment: 'Y' | 'N';
+        }) => void },
+      ) {
+        this.open = () => options.oncomplete({
+          zonecode: '06142',
+          address: '서울 강남구 테헤란로 123',
+          roadAddress: '서울 강남구 테헤란로 123',
+          jibunAddress: '서울 강남구 역삼동 123',
+          userSelectedType: 'R',
+          bname: '역삼동',
+          buildingName: '포모나타워',
+          apartment: 'N',
+        });
+      }),
+    };
+
+    fireEvent.change(screen.getByLabelText('기본 주소'), { target: { value: '테헤란로 123' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '주소 검색' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('우편번호')).toHaveValue('06142');
+    expect(screen.getByLabelText('기본 주소')).toHaveValue('서울 강남구 테헤란로 123 (역삼동)');
+    expect(screen.queryByText('주소가 입력되었습니다. 상세 주소를 확인해주세요.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('기본 주소'), { target: { value: '서울 강남구 테헤란로 999' } });
+    expect(screen.getByLabelText('우편번호')).toHaveValue('');
+    expect(screen.getByText('주소가 변경되어 주소 검색을 다시 진행해주세요.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('기본 주소'), { target: { value: '테헤란로 123' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '주소 검색' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('우편번호')).toHaveValue('06142');
+    expect(screen.getByLabelText('기본 주소')).toHaveValue('서울 강남구 테헤란로 123 (역삼동)');
+    expect(screen.queryByText('주소가 변경되어 주소 검색을 다시 진행해주세요.')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '배송 메모 문 앞에 놓아주세요' }));
+    fireEvent.click(screen.getByRole('option', { name: '배송 전 연락주세요' }));
+
+    expect(screen.getByRole('button', { name: '배송 메모 배송 전 연락주세요' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '주문 완료' }));
+    expect(screen.getByText('받는 분을 입력해주세요.')).toBeInTheDocument();
+    expect(screen.getByText('연락처를 입력해주세요.')).toBeInTheDocument();
+    expect(screen.queryByText('주소 검색으로 배송지를 선택해주세요.')).not.toBeInTheDocument();
+    expect(screen.getByText('상세 주소를 입력해주세요.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('받는 분'), { target: { value: '1' } });
+    expect(screen.getByText('받는 분은 2~30자로 입력해주세요.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('받는 분'), { target: { value: '홍길동' } });
+    expect(screen.queryByText('받는 분은 2~30자로 입력해주세요.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('상세 주소'), { target: { value: '상'.repeat(101) } });
+    expect(screen.getByText('상세 주소는 100자 이하로 입력해주세요.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('상세 주소'), { target: { value: '101동 1203호' } });
+    expect(screen.queryByText('상세 주소는 100자 이하로 입력해주세요.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '010-12' } });
+    expect(screen.getByLabelText('연락처')).toHaveValue('010-12');
+    expect(screen.getByText('올바른 연락처 형식으로 입력해주세요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '주문 완료' }));
+    expect(screen.getByText('올바른 연락처 형식으로 입력해주세요.')).toBeInTheDocument();
+    expect(screen.getByLabelText('연락처')).toHaveAttribute('aria-invalid', 'true');
+
+    fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '01012345678' } });
+    expect(screen.getByLabelText('연락처')).toHaveValue('010-1234-5678');
+    expect(screen.queryByText('올바른 연락처 형식으로 입력해주세요.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '0212345678' } });
+    expect(screen.getByLabelText('연락처')).toHaveValue('02-1234-5678');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '주문 완료' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('dialog', { name: '주문이 완료되었습니다' })).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith('/api/orders', expect.objectContaining({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    const [, requestInit] = vi.mocked(fetch).mock.calls.at(-1) ?? [];
+    const payload = JSON.parse(String(requestInit?.body));
+    expect(payload).toMatchObject({
+      schemaVersion: 'formona.order-submission.v1',
+      measurement: {
+        faceShape: FaceShape.HEART,
+        selectedStyle: {
+          id: 'low_arch',
+          name: '낮은 아치형',
+        },
+      },
+      shippingAddress: {
+        recipient: '홍길동',
+        phone: '02-1234-5678',
+        postalCode: '06142',
+        baseAddress: '서울 강남구 테헤란로 123 (역삼동)',
+        detailAddress: '101동 1203호',
+        deliveryMemo: '배송 전 연락주세요',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '이전 단계' }));
+
+    expect(screen.getByRole('heading', { name: '추천 눈썹 디자인 결과' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 단계' }));
+
+    expect(screen.getByRole('heading', { name: '배송지 정보 입력' })).toBeInTheDocument();
+    expect(screen.getByLabelText('받는 분')).toHaveValue('홍길동');
+    expect(screen.getByLabelText('연락처')).toHaveValue('02-1234-5678');
+    expect(screen.getByLabelText('우편번호')).toHaveValue('06142');
+    expect(screen.getByLabelText('기본 주소')).toHaveValue('서울 강남구 테헤란로 123 (역삼동)');
+    expect(screen.getByLabelText('상세 주소')).toHaveValue('101동 1203호');
+    expect(screen.getByRole('button', { name: '배송 메모 배송 전 연락주세요' })).toBeInTheDocument();
   });
 });

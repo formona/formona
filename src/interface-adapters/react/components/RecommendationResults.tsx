@@ -12,6 +12,7 @@ import {
 import { EYEBROW_METRIC_DISPLAY_ROWS } from '../../../domain/measurement-copy';
 import { EyebrowStyleCarousel } from './EyebrowStyleCarousel';
 import { FaceShapeImage } from './FaceShapeImage';
+import { FlowProgress } from './FlowProgress';
 
 interface RecommendationResultsProps {
   faceShape: FaceShape;
@@ -51,7 +52,9 @@ export function RecommendationResults({
       animate={{ opacity: 1, y: 0 }}
       className="app-container overflow-hidden bg-white"
     >
-      <div className="content-scrollable px-5 pb-[calc(112px+env(safe-area-inset-bottom))] pt-24">
+      <div className="content-scrollable flow-scroll-content px-5 pb-[calc(116px+env(safe-area-inset-bottom))]">
+        <FlowProgress currentStep={3} className="mx-auto mb-6" />
+
         <section className="space-y-4" aria-labelledby="face-shape-result">
           <div className="space-y-2">
             <p className="text-[10px] font-bold text-main-brown/55">분석 완료</p>
@@ -69,7 +72,7 @@ export function RecommendationResults({
 
           {measurementRows.length > 0 && (
             <div
-              className="grid grid-cols-2 gap-2 rounded-lg border border-main-brown/10 bg-white p-3"
+              className="flow-panel grid grid-cols-2 gap-2 p-3"
               aria-label={`IPD ${recommendationContext.ipdMm.toFixed(1)}mm 기준 추천 측정값`}
             >
               {measurementRows.map((metric) => (
@@ -81,7 +84,7 @@ export function RecommendationResults({
             </div>
           )}
 
-          <div className="rounded-lg border border-main-brown/10 bg-main-brown/[0.03] p-4">
+          <div className="flow-panel flow-panel-muted p-4">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-main-brown text-white">
                 <Sparkles size={16} aria-hidden="true" />
@@ -112,7 +115,7 @@ export function RecommendationResults({
           />
         </section>
 
-        <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 border-t border-main-brown/10 bg-white px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-4">
+        <div className="flow-action-bar">
           <p className="mb-3 text-center text-[12px] font-light leading-relaxed text-sub-gray">
             추천 스타일을 선택한 뒤 결과 설명과 측정 수치를 확인하세요.
           </p>
