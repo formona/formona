@@ -24,7 +24,6 @@ import { FaceGuidance, type TrackerStatus } from './FaceGuidance';
 interface CameraPreviewProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
-  previewFrameRef?: RefObject<HTMLDivElement | null>;
   cameraPermission: CameraPermissionState;
   trackerStatus: TrackerStatus;
   alignment: FaceAlignment;
@@ -64,7 +63,6 @@ interface PreviewGuideLines {
 export const CameraPreview = ({
   videoRef,
   canvasRef,
-  previewFrameRef: externalPreviewFrameRef,
   cameraPermission,
   trackerStatus,
   alignment,
@@ -81,8 +79,7 @@ export const CameraPreview = ({
   guidanceMode = 'capture',
 }: CameraPreviewProps) => {
   const permissionCopy = cameraPermission === 'granted' ? null : CAMERA_PERMISSION_COPY[cameraPermission];
-  const internalPreviewFrameRef = useRef<HTMLDivElement>(null);
-  const previewFrameRef = externalPreviewFrameRef ?? internalPreviewFrameRef;
+  const previewFrameRef = useRef<HTMLDivElement>(null);
   const arOverlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [overlayRevision, setOverlayRevision] = useState(0);
   const canShowLiveOverlay = cameraPermission === 'granted'
