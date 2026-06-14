@@ -39,6 +39,7 @@ const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null, alignm
 
 export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysisComplete }: CapturePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewFrameRef = useRef<HTMLDivElement>(null);
   const autoAnalysisTimerRef = useRef<number | null>(null);
   const autoAnalysisStartedRef = useRef(false);
   const latestAnalysisRef = useRef<FaceAnalysisResult | null>(null);
@@ -81,9 +82,17 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysis
     const video = videoRef.current;
     if (video.videoWidth <= 0 || video.videoHeight <= 0) return null;
 
-    const previewRect = video.getBoundingClientRect();
-    const previewWidth = video.clientWidth || previewRect.width;
-    const previewHeight = video.clientHeight || previewRect.height;
+    const previewFrame = previewFrameRef.current;
+    const previewFrameRect = previewFrame?.getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
+    const previewWidth = previewFrame?.clientWidth
+      || previewFrameRect?.width
+      || video.clientWidth
+      || videoRect.width;
+    const previewHeight = previewFrame?.clientHeight
+      || previewFrameRect?.height
+      || video.clientHeight
+      || videoRect.height;
     const hasPreviewSize = previewWidth > 0 && previewHeight > 0;
     const coverScale = hasPreviewSize
       ? Math.max(previewWidth / video.videoWidth, previewHeight / video.videoHeight)
@@ -294,6 +303,7 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysis
         <CameraPreview
           videoRef={videoRef}
           canvasRef={canvasRef}
+          previewFrameRef={previewFrameRef}
           cameraPermission={cameraPermission}
           trackerStatus={trackerStatus}
           alignment={alignment}
