@@ -37,9 +37,24 @@ const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null, alignm
     )),
 );
 
+const RESULT_CAPTURE_ASPECT_RATIO = 5 / 6;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getAnalysisCenter = (analysis: FaceAnalysisResult | null) => {
+  const origin = analysis?.faceCoordinateSpace.origin;
+  if (origin && Number.isFinite(origin.x) && Number.isFinite(origin.y)) {
+    return {
+      x: clamp(origin.x, 0, 1),
+      y: clamp(origin.y, 0, 1),
+    };
+  }
+
+  return { x: 0.5, y: 0.5 };
+};
+
 export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysisComplete }: CapturePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const previewFrameRef = useRef<HTMLDivElement>(null);
   const autoAnalysisTimerRef = useRef<number | null>(null);
   const autoAnalysisStartedRef = useRef(false);
   const latestAnalysisRef = useRef<FaceAnalysisResult | null>(null);
@@ -82,29 +97,18 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysis
     const video = videoRef.current;
     if (video.videoWidth <= 0 || video.videoHeight <= 0) return null;
 
-    const previewFrame = previewFrameRef.current;
-    const previewFrameRect = previewFrame?.getBoundingClientRect();
-    const videoRect = video.getBoundingClientRect();
-    const previewWidth = previewFrame?.clientWidth
-      || previewFrameRect?.width
-      || video.clientWidth
-      || videoRect.width;
-    const previewHeight = previewFrame?.clientHeight
-      || previewFrameRect?.height
-      || video.clientHeight
-      || videoRect.height;
-    const hasPreviewSize = previewWidth > 0 && previewHeight > 0;
-    const coverScale = hasPreviewSize
-      ? Math.max(previewWidth / video.videoWidth, previewHeight / video.videoHeight)
-      : 1;
-    const sourceWidth = hasPreviewSize
-      ? Math.min(video.videoWidth, previewWidth / coverScale)
+    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    const sourceWidth = videoAspectRatio > RESULT_CAPTURE_ASPECT_RATIO
+      ? video.videoHeight * RESULT_CAPTURE_ASPECT_RATIO
       : video.videoWidth;
-    const sourceHeight = hasPreviewSize
-      ? Math.min(video.videoHeight, previewHeight / coverScale)
-      : video.videoHeight;
-    const sourceX = Math.max(0, (video.videoWidth - sourceWidth) / 2);
-    const sourceY = Math.max(0, (video.videoHeight - sourceHeight) / 2);
+    const sourceHeight = videoAspectRatio > RESULT_CAPTURE_ASPECT_RATIO
+      ? video.videoHeight
+      : video.videoWidth / RESULT_CAPTURE_ASPECT_RATIO;
+    const analysisCenter = getAnalysisCenter(latestAnalysisRef.current);
+    const centerX = analysisCenter.x * video.videoWidth;
+    const centerY = analysisCenter.y * video.videoHeight;
+    const sourceX = clamp(centerX - (sourceWidth / 2), 0, video.videoWidth - sourceWidth);
+    const sourceY = clamp(centerY - (sourceHeight / 2), 0, video.videoHeight - sourceHeight);
     const canvas = canvasRef.current;
     canvas.width = Math.max(1, Math.round(sourceWidth));
     canvas.height = Math.max(1, Math.round(sourceHeight));
@@ -303,7 +307,6 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysis
         <CameraPreview
           videoRef={videoRef}
           canvasRef={canvasRef}
-          previewFrameRef={previewFrameRef}
           cameraPermission={cameraPermission}
           trackerStatus={trackerStatus}
           alignment={alignment}

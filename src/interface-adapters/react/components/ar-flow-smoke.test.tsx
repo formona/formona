@@ -483,7 +483,7 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(onAnalysisComplete).toHaveBeenCalledWith('data:image/jpeg;base64,monabrow', analysis);
   });
 
-  it('captures the visible preview crop when the mobile video layout size is unavailable', () => {
+  it('normalizes a mobile landscape camera frame to the result photo aspect ratio', () => {
     vi.useFakeTimers();
     vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1920);
     vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1080);
@@ -529,13 +529,13 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     const drawImageArgs = vi.mocked(canvasContextMock.drawImage).mock.calls.at(-1);
 
     expect(drawImageArgs?.[0]).toBeInstanceOf(HTMLVideoElement);
-    expect(drawImageArgs?.[1] as number).toBeCloseTo(630.94, 2);
+    expect(drawImageArgs?.[1] as number).toBe(510);
     expect(drawImageArgs?.[2] as number).toBe(0);
-    expect(drawImageArgs?.[3] as number).toBeCloseTo(658.13, 2);
+    expect(drawImageArgs?.[3] as number).toBe(900);
     expect(drawImageArgs?.[4] as number).toBe(1080);
     expect(drawImageArgs?.[5] as number).toBe(0);
     expect(drawImageArgs?.[6] as number).toBe(0);
-    expect(drawImageArgs?.[7] as number).toBe(658);
+    expect(drawImageArgs?.[7] as number).toBe(900);
     expect(drawImageArgs?.[8] as number).toBe(1080);
   });
 
