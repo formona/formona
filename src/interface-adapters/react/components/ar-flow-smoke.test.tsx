@@ -983,8 +983,10 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     );
 
     const resultImage = screen.getByAltText('분석 촬영 이미지');
+    const resultPhotoFrame = resultImage.closest('.result-photo-frame');
 
     expect(resultImage).toBeInTheDocument();
+    expect(resultPhotoFrame).toHaveClass('shrink-0');
     expect(resultImage).toHaveClass('object-cover');
     expect(resultImage).not.toHaveClass('object-contain');
     expect(container.querySelector('video')).not.toBeInTheDocument();

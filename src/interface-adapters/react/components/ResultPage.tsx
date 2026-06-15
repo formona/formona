@@ -107,7 +107,7 @@ export function ResultPage({
             </p>
           </div>
 
-          <div className="result-photo-frame relative mx-auto mt-4 w-full overflow-hidden bg-main-brown/[0.02]">
+          <div className="result-photo-frame relative mx-auto mt-4 w-full shrink-0 overflow-hidden bg-main-brown/[0.02]">
             {capturedImage ? (
               <Image
                 src={capturedImage}

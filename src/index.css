@@ -449,6 +449,7 @@
 }
 
 .result-photo-frame {
+  flex: 0 0 auto;
   width: min(100%, 340px);
   height: auto;
   max-width: 100%;
