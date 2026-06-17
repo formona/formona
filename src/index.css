@@ -431,6 +431,10 @@
   padding: var(--review-card-top) var(--review-page-gutter) var(--review-card-bottom);
 }
 
+.app-container.result-page {
+  --review-page-gutter: 16px;
+}
+
 .result-page-scroll,
 .address-page-scroll {
   display: flex;
@@ -448,9 +452,14 @@
   scrollbar-width: none;
 }
 
+.result-card {
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
 .result-photo-frame {
   flex: 0 0 auto;
-  width: min(100%, 340px);
+  width: min(100%, 372px);
   height: auto;
   max-width: 100%;
   aspect-ratio: 5 / 6;
@@ -595,6 +604,10 @@
     --review-card-bottom: max(16px, env(safe-area-inset-bottom));
   }
 
+  .app-container.result-page {
+    --review-page-gutter: 14px;
+  }
+
   .app-container.ipd-page {
     justify-content: flex-start;
     padding: var(--flow-card-top) var(--flow-page-gutter) var(--flow-card-bottom);
@@ -650,10 +663,6 @@
     min-height: 46px;
   }
 
-  .result-photo-frame {
-    width: min(100%, 326px);
-  }
-
   .ipd-value-control {
     grid-template-columns: 44px minmax(0, 1fr) 44px;
     gap: 7px;
@@ -679,6 +688,10 @@
     --review-page-gutter: 16px;
     --review-card-top: max(18px, calc(env(safe-area-inset-top) + 18px));
     --review-card-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+
+  .app-container.result-page {
+    --review-page-gutter: 12px;
   }
 
   .app-container.ipd-page {
@@ -755,8 +768,9 @@
     padding: 24px 14px 16px;
   }
 
-  .result-photo-frame {
-    width: min(100%, 286px);
+  .result-card {
+    padding-right: 10px;
+    padding-left: 10px;
   }
 
   .ipd-input-section {
