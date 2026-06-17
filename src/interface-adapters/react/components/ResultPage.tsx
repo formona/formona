@@ -113,7 +113,7 @@ export function ResultPage({
                 src={capturedImage}
                 alt="분석 촬영 이미지"
                 fill
-                sizes="(max-width: 430px) calc(100vw - 72px), 340px"
+                sizes="(max-width: 430px) calc(100vw - 52px), 372px"
                 unoptimized
                 className="object-cover object-center"
               />

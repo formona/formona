@@ -38,6 +38,7 @@ const isMeasurementReadyForResult = (analysis: FaceAnalysisResult | null, alignm
 );
 
 const RESULT_CAPTURE_ASPECT_RATIO = 5 / 6;
+const PORTRAIT_RESULT_CAPTURE_SCALE = 0.88;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -98,12 +99,17 @@ export function CapturePage({ ipdMm, autoStartCamera = false, onBack, onAnalysis
     if (video.videoWidth <= 0 || video.videoHeight <= 0) return null;
 
     const videoAspectRatio = video.videoWidth / video.videoHeight;
-    const sourceWidth = videoAspectRatio > RESULT_CAPTURE_ASPECT_RATIO
+    const baseSourceWidth = videoAspectRatio > RESULT_CAPTURE_ASPECT_RATIO
       ? video.videoHeight * RESULT_CAPTURE_ASPECT_RATIO
       : video.videoWidth;
-    const sourceHeight = videoAspectRatio > RESULT_CAPTURE_ASPECT_RATIO
+    const baseSourceHeight = videoAspectRatio > RESULT_CAPTURE_ASPECT_RATIO
       ? video.videoHeight
       : video.videoWidth / RESULT_CAPTURE_ASPECT_RATIO;
+    const captureScale = videoAspectRatio < RESULT_CAPTURE_ASPECT_RATIO
+      ? PORTRAIT_RESULT_CAPTURE_SCALE
+      : 1;
+    const sourceWidth = baseSourceWidth * captureScale;
+    const sourceHeight = baseSourceHeight * captureScale;
     const analysisCenter = getAnalysisCenter(latestAnalysisRef.current);
     const centerX = analysisCenter.x * video.videoWidth;
     const centerY = analysisCenter.y * video.videoHeight;

@@ -539,6 +539,41 @@ describe('MVP AR eyebrow recommendation flow smoke states', () => {
     expect(drawImageArgs?.[8] as number).toBe(1080);
   });
 
+  it('tightens portrait mobile camera captures so the face is not too small in results', () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1080);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1920);
+
+    const analysis = makeAnalysis();
+    const { onAnalysisComplete, rerender } = renderCapturePage();
+
+    trackerMock.state = {
+      ...trackerMock.state,
+      cameraPermission: 'granted',
+      trackerStatus: 'ready',
+      detectedFaceShape: FaceShape.OVAL,
+      alignment: readyAlignment,
+      analysis,
+    };
+    rerender(<CapturePage ipdMm={63} onAnalysisComplete={onAnalysisComplete} />);
+
+    act(() => {
+      vi.advanceTimersByTime(APP_TIMING_MS.recognitionHold);
+    });
+
+    const drawImageArgs = vi.mocked(canvasContextMock.drawImage).mock.calls.at(-1);
+
+    expect(drawImageArgs?.[0]).toBeInstanceOf(HTMLVideoElement);
+    expect(drawImageArgs?.[1] as number).toBeCloseTo(64.8, 5);
+    expect(drawImageArgs?.[2] as number).toBeCloseTo(255.36, 5);
+    expect(drawImageArgs?.[3] as number).toBeCloseTo(950.4, 5);
+    expect(drawImageArgs?.[4] as number).toBeCloseTo(1140.48, 5);
+    expect(drawImageArgs?.[5] as number).toBe(0);
+    expect(drawImageArgs?.[6] as number).toBe(0);
+    expect(drawImageArgs?.[7] as number).toBe(950);
+    expect(drawImageArgs?.[8] as number).toBe(1140);
+  });
+
   it('mounts a mirrored AR overlay canvas over the live camera frame and resizes it to the viewport box', async () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       width: 390,
